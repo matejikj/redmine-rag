@@ -72,6 +72,11 @@ make mock-redmine
 - `POST /v1/sync/redmine`
 - `POST /v1/extract/properties`
 
+`POST /v1/ask` behavior:
+- returns only grounded claims derived from retrieved chunks
+- enforces citation marker per claim (`[1]`, `[2]`, ...)
+- returns explicit "not enough evidence" fallback when grounding is insufficient
+
 ## Mock Redmine API
 
 For local development without real Redmine access:

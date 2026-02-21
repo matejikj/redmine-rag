@@ -15,6 +15,10 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+frontend/node_modules/
+frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
 
 # IDEs
 .vscode/settings.json

@@ -1,0 +1,62 @@
+# UI Design System (Task 16)
+
+This project uses a token-driven UI foundation in `frontend/src/styles/tokens.css`.
+
+## Design tokens
+
+- Typography:
+  - `--font sans`: Space Grotesk
+  - `--font serif`: Literata
+- Color:
+  - `--bg-page`, `--bg-accent` for layered background atmosphere
+  - `--surface-*` for cards and control surfaces
+  - `--ink-*` for content hierarchy
+  - `--brand`, `--brand-strong`, `--brand-soft`
+  - `--warning-soft`, `--danger-soft`, `--success-soft`
+- Spacing:
+  - `--space-1` … `--space-10`
+- Radius:
+  - `--radius-md`, `--radius-lg`, `--radius-xl`
+
+## Reusable primitives
+
+- Form controls:
+  - `TextField`
+  - `SelectField`
+  - `TextAreaField`
+- Actions:
+  - `Button` (`primary`, `secondary`, `ghost`, `danger`)
+- Layout blocks:
+  - `Card`
+  - `PageHeader`
+  - `AppShell`
+- Data display:
+  - `DataTable`
+  - `JobStatusBadge`
+  - `CitationCard`
+  - `MarkdownSurface`
+
+## Standard UI states
+
+- `LoadingState`
+- `EmptyState`
+- `ErrorState`
+
+State components are used by pages as default behavior for all API calls.
+
+## Accessibility baseline
+
+- Label-first form controls and `aria-invalid` for validation errors.
+- Global `:focus-visible` ring token.
+- Keyboard skip link (`Skip to main content`).
+- Contrast-safe status colors for warn/error/success markers.
+
+## API client and error handling
+
+- Typed API layer in `frontend/src/lib/api/client.ts`.
+- Centralized `ApiError` with actionable fallback messages.
+- Query/mutation hooks in `frontend/src/lib/api/hooks.ts`.
+
+## Component usage examples
+
+See `frontend/src/pages/DesignSystemPage.tsx` for canonical examples.

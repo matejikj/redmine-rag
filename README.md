@@ -32,6 +32,15 @@ make dev
 
 Open `http://127.0.0.1:8000/docs`.
 
+Frontend console (Task 16 foundation):
+
+```bash
+make ui-install
+make ui-dev
+```
+
+Open `http://127.0.0.1:5173` (development proxy to backend API).
+
 ## Docker (optional)
 
 ```bash
@@ -54,6 +63,9 @@ make eval-baseline
 make eval-gate
 make dataset-quality
 make mock-redmine
+make ui-dev
+make ui-build
+make ui-test
 .venv/bin/python -m redmine_rag.cli ops backup --output-dir backups
 .venv/bin/python -m redmine_rag.cli ops maintenance
 ```
@@ -69,10 +81,12 @@ make mock-redmine
 - `prompts/` reusable prompt assets
 - `evals/` evaluation datasets
 - `scripts/` bootstrap and CI scripts
+- `frontend/` React + Vite operator UI app
 
 ## API contracts (initial)
 
 - `GET /healthz`
+- `GET /app` (serves compiled frontend SPA when `frontend/dist` exists)
 - `POST /v1/ask`
 - `POST /v1/sync/redmine`
 - `GET /v1/sync/jobs`
@@ -179,6 +193,16 @@ REDMINE_API_KEY=mock-api-key
 ```
 
 See `docs/runbooks/mock-redmine.md` for details.
+
+## UI serving
+
+- Development: run `make ui-dev` and keep backend on `make dev`.
+- Production-like local serving:
+  1. `make ui-build`
+  2. `make dev`
+  3. open `http://127.0.0.1:8000/app`
+
+If `/app` returns `503`, frontend bundle is missing (`frontend/dist`).
 
 ## Ingestion module configuration
 

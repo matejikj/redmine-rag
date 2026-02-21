@@ -26,6 +26,11 @@ help:
 	@echo "  make backup      - create local state backup snapshot"
 	@echo "  make maintenance - run SQLite maintenance (checkpoint/vacuum/analyze)"
 	@echo "  make mock-redmine - run local Mock Redmine API"
+	@echo "  make ui-install   - install frontend dependencies"
+	@echo "  make ui-dev       - run frontend development server"
+	@echo "  make ui-build     - build frontend bundle for /app serving"
+	@echo "  make ui-test      - run frontend component tests"
+	@echo "  make ui-e2e       - run frontend e2e smoke tests"
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -87,3 +92,18 @@ maintenance:
 
 mock-redmine:
 	./scripts/mock-redmine.sh
+
+ui-install:
+	cd frontend && npm install
+
+ui-dev:
+	cd frontend && npm run dev
+
+ui-build:
+	cd frontend && npm run build
+
+ui-test:
+	cd frontend && npm run test
+
+ui-e2e:
+	cd frontend && npm run test:e2e

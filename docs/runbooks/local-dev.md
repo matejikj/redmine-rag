@@ -16,6 +16,24 @@ make migrate
 make dev
 ```
 
+## Start frontend console (Task 16+)
+
+```bash
+make ui-install
+make ui-dev
+```
+
+Open `http://127.0.0.1:5173`.
+
+Backend-served SPA mode:
+
+```bash
+make ui-build
+make dev
+```
+
+Then open `http://127.0.0.1:8000/app`.
+
 ## Basic smoke test
 
 ```bash

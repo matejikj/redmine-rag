@@ -87,6 +87,24 @@ Deterministic extraction:
 - `handoff_count`: number of `assigned_to_id` transitions where old/new assignee are both set and differ.
 - Validation markers in `issue_property.props_json.validation`: timestamp anomalies, status chain breaks, missing status values, unknown status IDs.
 
+LLM structured extraction (JSON Schema):
+- Enabled by `LLM_EXTRACT_ENABLED=true` and runs inside `POST /v1/extract/properties`.
+- Prompt and schema are versioned in repo:
+  - `prompts/extract_properties_v1.md`
+  - `prompts/extract_properties_schema_v1.json`
+- Extraction output is stored under `issue_property.props_json.llm` with:
+  - `extractor_version` (`llm-json-v1`)
+  - `prompt_version`
+  - `schema_version`
+  - `attempts`, `error_bucket`, `latency_ms`, `estimated_cost_usd`
+  - validated `properties` payload
+- Retry behavior:
+  - invalid JSON and schema violations are retried up to `LLM_EXTRACT_MAX_RETRIES`
+  - failed issues are bucketed (`invalid_json`, `schema_validation`, `timeout`, `provider_error`)
+- Version strategy:
+  - deterministic-only rows keep `extractor_version=det-v1`
+  - deterministic + LLM rows store `extractor_version=det-v1+llm-json-v1`
+
 Metrics summary endpoint:
 - `GET /v1/metrics/summary?project_ids=1&project_ids=2&from_date=2026-02-01T00:00:00Z&to_date=2026-02-21T23:59:59Z`
 - Returns global aggregates and `by_project` breakdown for issues extracted by `det-v1`.

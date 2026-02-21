@@ -10,7 +10,7 @@ Provide feature-level answers from full Redmine data (not only issues/wiki) with
 - `Storage` (`SQLite + FTS5`): generic raw payloads (`raw_entity`), normalized entities, chunk store.
 - `Vector layer` (`LocalNumpyVectorStore`): pluggable local similarity index.
 - `Ingestion` (`RedmineClient` + sync pipeline): incremental fetch and normalization.
-- `Extraction`: deterministic metrics and later LLM JSON extraction.
+- `Extraction`: deterministic metrics + controlled LLM JSON extraction with schema validation/retries.
 
 ## Redmine data coverage target
 

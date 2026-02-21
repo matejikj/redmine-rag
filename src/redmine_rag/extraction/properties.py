@@ -10,8 +10,20 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import selectinload
 
 from redmine_rag.api.schemas import ExtractResponse
+from redmine_rag.core.config import get_settings
 from redmine_rag.db.models import Issue, IssueMetric, IssueProperty, IssueStatus, Journal
 from redmine_rag.db.session import get_session_factory
+from redmine_rag.extraction.llm_structured import (
+    LLM_EXTRACTOR_VERSION,
+    PROMPT_VERSION,
+    SCHEMA_VERSION,
+    LlmExtractionResult,
+    StructuredExtractionClient,
+    build_structured_extraction_client,
+    load_structured_prompt,
+    load_structured_schema,
+    run_structured_extraction,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +60,8 @@ class _IssueExtraction:
     handoff_count: int
     props_json: dict[str, Any]
     anomaly_count: int
+    confidence: float
+    extractor_version: str
 
 
 async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractResponse:
@@ -58,8 +72,17 @@ async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractRespon
             detail="No issue IDs provided; nothing to extract.",
         )
 
+    settings = get_settings()
     session_factory = get_session_factory()
     extracted_at = datetime.now(UTC)
+    llm_enabled = settings.llm_extract_enabled
+    llm_client: StructuredExtractionClient | None = None
+    llm_prompt = ""
+    llm_schema: dict[str, Any] = {}
+    if llm_enabled:
+        llm_client = build_structured_extraction_client(settings.llm_provider)
+        llm_prompt = load_structured_prompt()
+        llm_schema = load_structured_schema()
 
     async with session_factory() as session:
         issue_stmt = select(Issue).options(selectinload(Issue.journals)).order_by(Issue.id.asc())
@@ -82,7 +105,96 @@ async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractRespon
             for status_id, name, is_closed in status_rows
         }
 
-        extractions = [_extract_issue(issue, status_meta=status_meta) for issue in issues]
+        llm_success_count = 0
+        llm_failure_count = 0
+        llm_skipped_count = 0
+        llm_retry_count = 0
+        llm_error_buckets: dict[str, int] = {}
+        llm_estimated_cost_usd_total = 0.0
+
+        extractions: list[_IssueExtraction] = []
+        for batch in _iter_batches(issues, settings.llm_extract_batch_size):
+            for issue in batch:
+                extraction = _extract_issue(issue, status_meta=status_meta)
+                if llm_enabled and llm_client is not None:
+                    issue_context = _build_issue_context(
+                        issue=issue,
+                        max_chars=settings.llm_extract_max_context_chars,
+                    )
+                    estimated_cost_usd = _estimate_extraction_cost_usd(issue_context)
+                    if (
+                        settings.llm_extract_cost_limit_usd > 0
+                        and llm_estimated_cost_usd_total + estimated_cost_usd
+                        > settings.llm_extract_cost_limit_usd
+                    ):
+                        llm_skipped_count += 1
+                        extraction.confidence = 0.0
+                        extraction.extractor_version = _combined_extractor_version()
+                        extraction.props_json["llm"] = {
+                            "status": "skipped",
+                            "extractor_version": LLM_EXTRACTOR_VERSION,
+                            "prompt_version": PROMPT_VERSION,
+                            "schema_version": SCHEMA_VERSION,
+                            "attempts": 0,
+                            "error_bucket": "cost_limit_reached",
+                            "latency_ms": 0,
+                            "estimated_cost_usd": estimated_cost_usd,
+                            "last_error": None,
+                            "properties": None,
+                        }
+                        extractions.append(extraction)
+                        continue
+
+                    llm_result = await run_structured_extraction(
+                        client=llm_client,
+                        system_prompt=llm_prompt,
+                        user_content=issue_context,
+                        schema=llm_schema,
+                        model=settings.llm_model,
+                        timeout_s=settings.llm_extract_timeout_s,
+                        max_retries=settings.llm_extract_max_retries,
+                    )
+                    llm_estimated_cost_usd_total += estimated_cost_usd
+                    llm_retry_count += max(llm_result.attempts - 1, 0)
+                    if llm_result.success:
+                        llm_success_count += 1
+                        extraction.confidence = (
+                            llm_result.properties.confidence
+                            if llm_result.properties is not None
+                            else 0.0
+                        )
+                        extraction.extractor_version = _combined_extractor_version()
+                        extraction.props_json["llm"] = _llm_payload_from_result(
+                            llm_result=llm_result,
+                            estimated_cost_usd=estimated_cost_usd,
+                        )
+                    else:
+                        llm_failure_count += 1
+                        extraction.confidence = 0.0
+                        extraction.extractor_version = _combined_extractor_version()
+                        extraction.props_json["llm"] = _llm_payload_from_result(
+                            llm_result=llm_result,
+                            estimated_cost_usd=estimated_cost_usd,
+                        )
+                        if llm_result.error_bucket is not None:
+                            llm_error_buckets[llm_result.error_bucket] = (
+                                llm_error_buckets.get(llm_result.error_bucket, 0) + 1
+                            )
+                else:
+                    llm_skipped_count += 1
+                    extraction.props_json["llm"] = {
+                        "status": "skipped",
+                        "extractor_version": LLM_EXTRACTOR_VERSION,
+                        "prompt_version": PROMPT_VERSION,
+                        "schema_version": SCHEMA_VERSION,
+                        "attempts": 0,
+                        "error_bucket": "llm_extract_disabled",
+                        "latency_ms": 0,
+                        "estimated_cost_usd": 0.0,
+                        "last_error": None,
+                        "properties": None,
+                    }
+                extractions.append(extraction)
         metric_rows = [
             {
                 "issue_id": extraction.issue_id,
@@ -97,8 +209,8 @@ async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractRespon
         property_rows = [
             {
                 "issue_id": extraction.issue_id,
-                "extractor_version": EXTRACTOR_VERSION,
-                "confidence": 1.0,
+                "extractor_version": extraction.extractor_version,
+                "confidence": extraction.confidence,
                 "props_json": extraction.props_json,
                 "extracted_at": extracted_at,
             }
@@ -111,20 +223,33 @@ async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractRespon
 
     total_anomalies = sum(extraction.anomaly_count for extraction in extractions)
     logger.info(
-        "Deterministic issue extraction finished",
+        "Issue extraction finished",
         extra={
             "processed_issues": len(extractions),
             "extractor_version": EXTRACTOR_VERSION,
             "anomaly_count": total_anomalies,
             "scope_issue_ids": issue_ids,
+            "llm_enabled": llm_enabled,
+            "llm_success_count": llm_success_count,
+            "llm_failure_count": llm_failure_count,
+            "llm_skipped_count": llm_skipped_count,
+            "llm_retry_count": llm_retry_count,
+            "llm_error_buckets": llm_error_buckets,
+            "llm_estimated_cost_usd_total": round(llm_estimated_cost_usd_total, 6),
         },
     )
+    llm_summary = ""
+    if llm_enabled:
+        llm_summary = (
+            f" LLM ok={llm_success_count}, failed={llm_failure_count}, "
+            f"skipped={llm_skipped_count}, retries={llm_retry_count}."
+        )
     return ExtractResponse(
         accepted=True,
         processed_issues=len(extractions),
         detail=(
             f"Deterministic extraction completed with {total_anomalies} anomaly markers "
-            f"(extractor={EXTRACTOR_VERSION})."
+            f"(extractor={EXTRACTOR_VERSION}).{llm_summary}"
         ),
     )
 
@@ -296,6 +421,8 @@ def _extract_issue(issue: Issue, *, status_meta: dict[int, _StatusMeta]) -> _Iss
         anomaly_count=(
             timestamp_anomaly_count + invalid_transition_count + len(unknown_status_ids)
         ),
+        confidence=1.0,
+        extractor_version=EXTRACTOR_VERSION,
     )
 
 
@@ -405,3 +532,83 @@ def _to_iso(value: datetime | None) -> str | None:
     if value is None:
         return None
     return value.isoformat()
+
+
+def _combined_extractor_version() -> str:
+    return f"{EXTRACTOR_VERSION}+{LLM_EXTRACTOR_VERSION}"
+
+
+def _llm_payload_from_result(
+    *,
+    llm_result: LlmExtractionResult,
+    estimated_cost_usd: float,
+) -> dict[str, Any]:
+    status = "ok" if llm_result.success else "failed"
+    properties_payload: dict[str, Any] | None = None
+    if llm_result.properties is not None:
+        properties_payload = llm_result.properties.model_dump(mode="json")
+    return {
+        "status": status,
+        "extractor_version": LLM_EXTRACTOR_VERSION,
+        "prompt_version": PROMPT_VERSION,
+        "schema_version": SCHEMA_VERSION,
+        "attempts": llm_result.attempts,
+        "error_bucket": llm_result.error_bucket,
+        "latency_ms": llm_result.latency_ms,
+        "estimated_cost_usd": estimated_cost_usd,
+        "last_error": llm_result.last_error,
+        "properties": properties_payload,
+    }
+
+
+def _iter_batches(items: list[Issue], batch_size: int) -> list[list[Issue]]:
+    safe_batch_size = max(batch_size, 1)
+    return [
+        items[index : index + safe_batch_size] for index in range(0, len(items), safe_batch_size)
+    ]
+
+
+def _build_issue_context(*, issue: Issue, max_chars: int) -> str:
+    lines = [
+        f"Issue id: {issue.id}",
+        f"Project id: {issue.project_id}",
+        f"Tracker: {issue.tracker or ''}",
+        f"Status: {issue.status or ''}",
+        f"Priority: {issue.priority or ''}",
+        f"Subject: {issue.subject}",
+        f"Description: {issue.description or ''}",
+    ]
+    if issue.custom_fields:
+        lines.append(f"Custom fields: {issue.custom_fields}")
+
+    journals = sorted(
+        issue.journals,
+        key=lambda journal: (_ensure_utc(journal.created_on), int(journal.id)),
+    )
+    for journal in journals:
+        details = _extract_detail_items(journal)
+        detail_lines = []
+        for detail in details:
+            name = str(detail.get("name", "")).strip()
+            old_value = str(detail.get("old_value", "")).strip()
+            new_value = str(detail.get("new_value", "")).strip()
+            if name:
+                detail_lines.append(f"{name}:{old_value}->{new_value}")
+        lines.append(
+            "Journal "
+            f"{journal.id} at {journal.created_on.isoformat()} "
+            f"by {journal.author or journal.user_id}: {journal.notes or ''}"
+        )
+        if detail_lines:
+            lines.append(f"Journal {journal.id} details: {', '.join(detail_lines)}")
+
+    context = "\n".join(lines).strip()
+    if len(context) <= max_chars:
+        return context
+    return context[:max_chars]
+
+
+def _estimate_extraction_cost_usd(context: str) -> float:
+    # Local deterministic estimate: approximately 750 chars ~ 1k tokens.
+    estimated_tokens = max(len(context) / 0.75, 1.0)
+    return round((estimated_tokens / 1000.0) * 0.0006, 6)

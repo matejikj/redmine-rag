@@ -104,7 +104,7 @@ async def _aggregate_metrics(
         .select_from(Issue)
         .join(IssueMetric, IssueMetric.issue_id == Issue.id)
         .join(IssueProperty, IssueProperty.issue_id == Issue.id)
-        .where(IssueProperty.extractor_version == EXTRACTOR_VERSION)
+        .where(IssueProperty.extractor_version.like(f"{EXTRACTOR_VERSION}%"))
     )
 
     if project_ids:
@@ -146,7 +146,7 @@ async def _aggregate_by_project(
         .select_from(Issue)
         .join(IssueMetric, IssueMetric.issue_id == Issue.id)
         .join(IssueProperty, IssueProperty.issue_id == Issue.id)
-        .where(IssueProperty.extractor_version == EXTRACTOR_VERSION)
+        .where(IssueProperty.extractor_version.like(f"{EXTRACTOR_VERSION}%"))
     )
 
     if project_ids:

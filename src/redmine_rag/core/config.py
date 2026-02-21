@@ -57,6 +57,12 @@ class Settings(BaseSettings):
 
     llm_provider: str = "api"
     llm_model: str = "gpt-5-mini"
+    llm_extract_enabled: bool = False
+    llm_extract_max_retries: int = 2
+    llm_extract_batch_size: int = 20
+    llm_extract_max_context_chars: int = 6000
+    llm_extract_timeout_s: float = 20.0
+    llm_extract_cost_limit_usd: float = 1.0
 
     @field_validator("redmine_project_ids", mode="before")
     @classmethod
@@ -102,7 +108,14 @@ class Settings(BaseSettings):
             return [item.strip() for item in value.split(",") if item.strip()]
         raise ValueError("Invalid REDMINE_WIKI_PAGES value")
 
-    @field_validator("embedding_dim", "retrieval_rrf_k", "retrieval_candidate_multiplier")
+    @field_validator(
+        "embedding_dim",
+        "retrieval_rrf_k",
+        "retrieval_candidate_multiplier",
+        "llm_extract_max_retries",
+        "llm_extract_batch_size",
+        "llm_extract_max_context_chars",
+    )
     @classmethod
     def validate_positive_ints(cls, value: int) -> int:
         if value <= 0:
@@ -114,6 +127,13 @@ class Settings(BaseSettings):
     def validate_weights(cls, value: float) -> float:
         if value < 0:
             raise ValueError("Weight must be >= 0")
+        return value
+
+    @field_validator("llm_extract_timeout_s", "llm_extract_cost_limit_usd")
+    @classmethod
+    def validate_non_negative_floats(cls, value: float) -> float:
+        if value < 0:
+            raise ValueError("Value must be >= 0")
         return value
 
     @property

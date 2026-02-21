@@ -65,6 +65,18 @@ For full vector rebuild:
 .venv/bin/python -m redmine_rag.cli extract run
 ```
 
+Enable LLM structured extraction (optional):
+
+```bash
+export LLM_PROVIDER=mock
+export LLM_EXTRACT_ENABLED=true
+export LLM_EXTRACT_MAX_RETRIES=2
+export LLM_EXTRACT_TIMEOUT_S=20
+export LLM_EXTRACT_COST_LIMIT_USD=1.0
+```
+
+For local development the default provider `mock` is deterministic and offline.
+
 Or via API:
 
 ```bash
@@ -72,6 +84,11 @@ curl -X POST http://127.0.0.1:8000/v1/extract/properties \
   -H 'content-type: application/json' \
   -d '{}'
 ```
+
+Notes on extraction limits:
+- `LLM_EXTRACT_TIMEOUT_S` bounds per-issue latency budget.
+- `LLM_EXTRACT_COST_LIMIT_USD` limits total estimated extraction spend per run.
+- `LLM_EXTRACT_MAX_CONTEXT_CHARS` caps issue context size to keep prompts bounded.
 
 ## Query workflow metrics summary
 

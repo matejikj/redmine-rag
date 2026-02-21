@@ -53,6 +53,12 @@ Task 18 ask workbench is available under `Ask` page in the UI:
 - citation explorer drawer with source filter, search, and sort
 - explain/debug mode for retrieval and synthesis diagnostics
 
+Task 19 metrics dashboard is available under `Metrics` page in the UI:
+- `/v1/metrics/summary` with deterministic project/date filters
+- extraction control panel for `POST /v1/extract/properties`
+- LLM extraction counters (success/failed/skipped/retries) from latest run
+- eval/regression widget backed by latest artifacts via `GET /v1/evals/latest`
+
 ## Docker (optional)
 
 ```bash
@@ -105,6 +111,7 @@ make ui-test
 - `GET /v1/sync/jobs/{job_id}`
 - `POST /v1/extract/properties`
 - `GET /v1/metrics/summary`
+- `GET /v1/evals/latest`
 
 `POST /v1/ask` behavior:
 - returns only grounded claims derived from retrieved chunks

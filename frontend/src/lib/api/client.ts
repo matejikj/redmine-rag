@@ -1,7 +1,11 @@
 import type {
   AskRequest,
   AskResponse,
+  EvalArtifactsResponse,
+  ExtractRequest,
+  ExtractResponse,
   HealthResponse,
+  MetricsSummaryResponse,
   SyncJobResponse,
   SyncJobListResponse,
   SyncRequest,
@@ -75,6 +79,33 @@ export const apiClient = {
       body: payload,
       signal
     });
+  },
+  runExtraction(payload: ExtractRequest): Promise<ExtractResponse> {
+    return requestJson<ExtractResponse>("/v1/extract/properties", {
+      method: "POST",
+      body: payload
+    });
+  },
+  getMetricsSummary(params: {
+    projectIds: number[];
+    fromDate: string | null;
+    toDate: string | null;
+  }): Promise<MetricsSummaryResponse> {
+    const search = new URLSearchParams();
+    for (const projectId of params.projectIds) {
+      search.append("project_ids", String(projectId));
+    }
+    if (params.fromDate) {
+      search.set("from_date", params.fromDate);
+    }
+    if (params.toDate) {
+      search.set("to_date", params.toDate);
+    }
+    const query = search.toString();
+    return requestJson<MetricsSummaryResponse>(`/v1/metrics/summary${query ? `?${query}` : ""}`);
+  },
+  getEvalArtifacts(): Promise<EvalArtifactsResponse> {
+    return requestJson<EvalArtifactsResponse>("/v1/evals/latest");
   },
   triggerSync(payload: SyncRequest): Promise<SyncResponse> {
     return requestJson<SyncResponse>("/v1/sync/redmine", {

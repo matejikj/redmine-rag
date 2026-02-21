@@ -142,3 +142,105 @@ test("ask workbench and citation explorer journey", async ({ page }) => {
   await page.getByLabel("Source filter").selectOption("wiki");
   await expect(page.getByText("1:Incident-Triage-Playbook")).toBeVisible();
 });
+
+test("metrics dashboard extraction and evaluation flow", async ({ page }) => {
+  await page.route("**/v1/metrics/summary?**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        generated_at: "2026-02-21T11:12:00Z",
+        from_date: "2026-02-01T00:00:00Z",
+        to_date: "2026-02-21T23:59:59Z",
+        project_ids: [1],
+        extractor_version: "det-v1",
+        issues_total: 12,
+        issues_with_first_response: 10,
+        issues_with_resolution: 8,
+        avg_first_response_s: 420,
+        avg_resolution_s: 8400,
+        reopen_total: 3,
+        touch_total: 49,
+        handoff_total: 11,
+        by_project: [
+          {
+            project_id: 1,
+            issues_total: 12,
+            issues_with_first_response: 10,
+            issues_with_resolution: 8,
+            avg_first_response_s: 420,
+            avg_resolution_s: 8400,
+            reopen_total: 3,
+            touch_total: 49,
+            handoff_total: 11
+          }
+        ]
+      })
+    });
+  });
+
+  await page.route("**/v1/evals/latest", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        generated_at: "2026-02-21T11:12:30Z",
+        status: "fail",
+        current_report_path: "evals/reports/latest_eval_report.json",
+        baseline_path: "evals/baseline_metrics.v1.json",
+        regression_gate_path: "evals/reports/latest_regression_gate.json",
+        current_metrics: {
+          query_count: 50,
+          citation_coverage: 0.96,
+          groundedness: 0.98,
+          retrieval_hit_rate: 0.97,
+          source_type_coverage: { issue: 45 }
+        },
+        baseline_metrics: {
+          query_count: 50,
+          citation_coverage: 1.0,
+          groundedness: 1.0,
+          retrieval_hit_rate: 1.0,
+          source_type_coverage: { issue: 44 }
+        },
+        comparisons: [
+          {
+            metric: "citation_coverage",
+            baseline: 1.0,
+            current: 0.96,
+            delta: -0.04,
+            allowed_drop: 0.01,
+            passed: false
+          }
+        ],
+        failures: ["citation_coverage dropped below threshold"],
+        llm_runtime_failures: [],
+        notes: []
+      })
+    });
+  });
+
+  await page.route("**/v1/extract/properties", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        accepted: true,
+        processed_issues: 4,
+        detail: "Deterministic extraction completed. LLM ok=3, failed=1, skipped=0, retries=2."
+      })
+    });
+  });
+
+  await page.goto("/metrics");
+  await expect(
+    page.getByRole("heading", { name: "Metrics, Extraction, and Evaluation Dashboard" })
+  ).toBeVisible();
+  await expect(page.getByText("Per-Project Breakdown")).toBeVisible();
+  await expect(page.getByText("Gate status:")).toBeVisible();
+  await expect(page.getByText("FAIL")).toBeVisible();
+
+  await page.getByRole("button", { name: "Run extraction" }).click();
+  await expect(page.getByText("processed 4 issues")).toBeVisible();
+  await expect(page.getByText("success: 3")).toBeVisible();
+});

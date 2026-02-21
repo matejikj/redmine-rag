@@ -164,3 +164,34 @@ class MetricsSummaryResponse(BaseModel):
     touch_total: int
     handoff_total: int
     by_project: list[MetricsSummaryByProject]
+
+
+class EvalMetricsSnapshot(BaseModel):
+    query_count: int
+    citation_coverage: float
+    groundedness: float
+    retrieval_hit_rate: float
+    source_type_coverage: dict[str, int] = Field(default_factory=dict)
+
+
+class EvalComparisonRow(BaseModel):
+    metric: str
+    baseline: float
+    current: float
+    delta: float
+    allowed_drop: float
+    passed: bool
+
+
+class EvalArtifactsResponse(BaseModel):
+    generated_at: datetime
+    status: Literal["pass", "fail", "missing"]
+    current_report_path: str | None = None
+    baseline_path: str | None = None
+    regression_gate_path: str | None = None
+    current_metrics: EvalMetricsSnapshot | None = None
+    baseline_metrics: EvalMetricsSnapshot | None = None
+    comparisons: list[EvalComparisonRow] = Field(default_factory=list)
+    failures: list[str] = Field(default_factory=list)
+    llm_runtime_failures: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)

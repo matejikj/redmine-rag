@@ -70,3 +70,18 @@ Use these realistic support questions during manual UX checks:
 3. `What evidence points to root cause and mitigation steps?`
 4. `Summarize user impact and next actions for the latest auth incident.`
 5. `What changed between initial incident and final resolution?`
+
+## Metrics Dashboard Usage (Task 19)
+
+Use this operator flow for terminal-free quality checks:
+
+1. Open `Metrics` page.
+2. Set `project_ids` and optional date window, then `Apply filters`.
+3. Review global KPIs and `Per-Project Breakdown`.
+4. Trigger `Run extraction` (optional issue scope) and verify latest counters:
+   - `success`, `failed`, `skipped`, `retries`
+5. Inspect `Evaluation and Regression Gate`:
+   - gate status (`PASS`/`FAIL`/`MISSING`)
+   - metric deltas against baseline
+   - failure notes and artifact hints
+6. Export snapshots for handover or incident notes.

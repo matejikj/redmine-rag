@@ -80,6 +80,76 @@ export interface SyncJobListResponse {
   counts: SyncJobCounts;
 }
 
+export interface ExtractRequest {
+  issue_ids: number[] | null;
+}
+
+export interface ExtractResponse {
+  accepted: boolean;
+  processed_issues: number;
+  detail: string;
+}
+
+export interface MetricsSummaryByProject {
+  project_id: number;
+  issues_total: number;
+  issues_with_first_response: number;
+  issues_with_resolution: number;
+  avg_first_response_s: number | null;
+  avg_resolution_s: number | null;
+  reopen_total: number;
+  touch_total: number;
+  handoff_total: number;
+}
+
+export interface MetricsSummaryResponse {
+  generated_at: string;
+  from_date: string | null;
+  to_date: string | null;
+  project_ids: number[];
+  extractor_version: string;
+  issues_total: number;
+  issues_with_first_response: number;
+  issues_with_resolution: number;
+  avg_first_response_s: number | null;
+  avg_resolution_s: number | null;
+  reopen_total: number;
+  touch_total: number;
+  handoff_total: number;
+  by_project: MetricsSummaryByProject[];
+}
+
+export interface EvalMetricsSnapshot {
+  query_count: number;
+  citation_coverage: number;
+  groundedness: number;
+  retrieval_hit_rate: number;
+  source_type_coverage: Record<string, number>;
+}
+
+export interface EvalComparisonRow {
+  metric: string;
+  baseline: number;
+  current: number;
+  delta: number;
+  allowed_drop: number;
+  passed: boolean;
+}
+
+export interface EvalArtifactsResponse {
+  generated_at: string;
+  status: "pass" | "fail" | "missing";
+  current_report_path: string | null;
+  baseline_path: string | null;
+  regression_gate_path: string | null;
+  current_metrics: EvalMetricsSnapshot | null;
+  baseline_metrics: EvalMetricsSnapshot | null;
+  comparisons: EvalComparisonRow[];
+  failures: string[];
+  llm_runtime_failures: string[];
+  notes: string[];
+}
+
 export const SYNC_MODULES = [
   "projects",
   "users",

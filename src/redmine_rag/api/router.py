@@ -7,6 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from redmine_rag.api.schemas import (
     AskRequest,
     AskResponse,
+    EvalArtifactsResponse,
     ExtractRequest,
     ExtractResponse,
     HealthResponse,
@@ -18,6 +19,7 @@ from redmine_rag.api.schemas import (
 )
 from redmine_rag.extraction.properties import extract_issue_properties
 from redmine_rag.services.ask_service import answer_question
+from redmine_rag.services.eval_artifacts_service import get_eval_artifacts_summary
 from redmine_rag.services.metrics_service import get_metrics_summary
 from redmine_rag.services.ops_service import get_health_status
 from redmine_rag.services.sync_service import get_sync_job, list_sync_jobs, queue_sync_job
@@ -72,3 +74,8 @@ async def metrics_summary(
         from_date=from_date,
         to_date=to_date,
     )
+
+
+@router.get("/v1/evals/latest", response_model=EvalArtifactsResponse)
+async def evals_latest() -> EvalArtifactsResponse:
+    return await get_eval_artifacts_summary()

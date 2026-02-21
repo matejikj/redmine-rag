@@ -53,6 +53,7 @@ make eval
 - `migrations/` Alembic migration scripts
 - `tests/` test suite
 - `docs/` architecture and runbooks
+- `docs/data-model.md` normalized and raw data model reference
 - `prompts/` reusable prompt assets
 - `evals/` evaluation datasets
 - `scripts/` bootstrap and CI scripts

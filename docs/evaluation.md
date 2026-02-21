@@ -9,6 +9,7 @@ RAG quality must be measured continuously, not guessed.
 - Citation coverage: share of claims with at least one source.
 - Groundedness: share of claims supported by retrieved chunks.
 - Retrieval hit rate: proportion of questions where relevant chunk appears in top K.
+- Source-type coverage: distribution of used evidence across Redmine source types (issues, journals, wiki, time entries, news, documents, messages, ...).
 
 ## Loop
 

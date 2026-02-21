@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from math import ceil
 
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
@@ -12,6 +14,9 @@ from redmine_rag.api.schemas import AskFilters
 from redmine_rag.core.config import get_settings
 from redmine_rag.indexing.embeddings import deterministic_embed_text
 from redmine_rag.indexing.vector_store import LocalNumpyVectorStore
+from redmine_rag.services.query_planner import build_retrieval_plan
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -37,6 +42,15 @@ class RetrievalDiagnostics:
     lexical_weight: float
     vector_weight: float
     rrf_k: int
+    planner_mode: str = "disabled"
+    planner_status: str = "disabled"
+    planner_latency_ms: int | None = None
+    planner_normalized_query: str | None = None
+    planner_expansions: list[str] | None = None
+    planner_confidence: float | None = None
+    planner_error: str | None = None
+    planner_queries: list[str] | None = None
+    planner_filters_applied: dict[str, object] | None = None
 
 
 @dataclass(slots=True)
@@ -83,22 +97,82 @@ async def hybrid_retrieve(
 ) -> HybridRetrievalResult:
     settings = get_settings()
     candidate_limit = max(top_k * settings.retrieval_candidate_multiplier, top_k)
-    lexical = await _retrieve_lexical_candidates(
-        session=session,
-        query=query,
-        filters=filters,
-        limit=candidate_limit,
-    )
+    planner_queries = [query]
+    effective_filters = filters
+    planner_mode = "disabled"
+    planner_status = "disabled"
+    planner_latency_ms: int | None = None
+    planner_normalized_query: str | None = None
+    planner_expansions: list[str] = []
+    planner_confidence: float | None = None
+    planner_error: str | None = None
 
-    vector_records = await _retrieve_vector_candidates(
-        session=session,
-        query=query,
-        filters=filters,
-        limit=candidate_limit,
-        index_path=settings.vector_index_path,
-        meta_path=settings.vector_meta_path,
-        embedding_dim=settings.embedding_dim,
-    )
+    if settings.retrieval_planner_enabled:
+        plan, planner_diagnostics = await build_retrieval_plan(
+            query=query,
+            base_filters=filters,
+            settings=settings,
+        )
+        planner_mode = planner_diagnostics.planner_mode
+        planner_status = planner_diagnostics.planner_status
+        planner_latency_ms = planner_diagnostics.latency_ms
+        planner_normalized_query = planner_diagnostics.normalized_query
+        planner_expansions = planner_diagnostics.expansions
+        planner_confidence = planner_diagnostics.confidence
+        planner_error = planner_diagnostics.error
+
+        if plan is not None:
+            effective_filters = await _apply_planner_filters(
+                session=session,
+                base_filters=filters,
+                suggested_filters=plan.suggested_filters,
+            )
+            planner_queries = _plan_queries(
+                original_query=query,
+                normalized_query=plan.normalized_query,
+                expansions=plan.expansions,
+                max_expansions=settings.retrieval_planner_max_expansions,
+            )
+        logger.info(
+            "Retrieval planner completed",
+            extra={
+                "planner_mode": planner_mode,
+                "planner_status": planner_status,
+                "planner_latency_ms": planner_latency_ms,
+                "planner_normalized_query": planner_normalized_query,
+                "planner_expansions": planner_expansions,
+                "planner_confidence": planner_confidence,
+                "planner_error": planner_error,
+                "planner_queries": planner_queries,
+            },
+        )
+
+    per_query_limit = max(top_k, ceil(candidate_limit / max(len(planner_queries), 1)))
+    lexical_all: list[_ChunkRecord] = []
+    vector_all: list[_ChunkRecord] = []
+    for planner_query in planner_queries:
+        lexical_all.extend(
+            await _retrieve_lexical_candidates(
+                session=session,
+                query=planner_query,
+                filters=effective_filters,
+                limit=per_query_limit,
+            )
+        )
+        vector_all.extend(
+            await _retrieve_vector_candidates(
+                session=session,
+                query=planner_query,
+                filters=effective_filters,
+                limit=per_query_limit,
+                index_path=settings.vector_index_path,
+                meta_path=settings.vector_meta_path,
+                embedding_dim=settings.embedding_dim,
+            )
+        )
+
+    lexical = _dedupe_records(records=lexical_all, score_key="lexical_score")
+    vector_records = _dedupe_records(records=vector_all, score_key="vector_score")
 
     lexical_ids = [record.id for record in lexical]
     vector_ids = [record.id for record in vector_records]
@@ -122,6 +196,15 @@ async def hybrid_retrieve(
             lexical_weight=settings.retrieval_lexical_weight,
             vector_weight=settings.retrieval_vector_weight,
             rrf_k=settings.retrieval_rrf_k,
+            planner_mode=planner_mode,
+            planner_status=planner_status,
+            planner_latency_ms=planner_latency_ms,
+            planner_normalized_query=planner_normalized_query,
+            planner_expansions=planner_expansions,
+            planner_confidence=planner_confidence,
+            planner_error=planner_error,
+            planner_queries=planner_queries,
+            planner_filters_applied=_filters_to_diagnostics(effective_filters),
         )
         return HybridRetrievalResult(chunks=[], diagnostics=diagnostics)
 
@@ -170,8 +253,119 @@ async def hybrid_retrieve(
         lexical_weight=settings.retrieval_lexical_weight,
         vector_weight=settings.retrieval_vector_weight,
         rrf_k=settings.retrieval_rrf_k,
+        planner_mode=planner_mode,
+        planner_status=planner_status,
+        planner_latency_ms=planner_latency_ms,
+        planner_normalized_query=planner_normalized_query,
+        planner_expansions=planner_expansions,
+        planner_confidence=planner_confidence,
+        planner_error=planner_error,
+        planner_queries=planner_queries,
+        planner_filters_applied=_filters_to_diagnostics(effective_filters),
     )
     return HybridRetrievalResult(chunks=chunks, diagnostics=diagnostics)
+
+
+def _plan_queries(
+    *,
+    original_query: str,
+    normalized_query: str,
+    expansions: list[str],
+    max_expansions: int,
+) -> list[str]:
+    output: list[str] = []
+    seen: set[str] = set()
+    for candidate in [normalized_query, original_query]:
+        normalized = " ".join(candidate.split()).strip()
+        if not normalized:
+            continue
+        key = normalized.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        output.append(normalized)
+    for candidate in expansions[: max(max_expansions, 0)]:
+        normalized = " ".join(candidate.split()).strip()
+        if not normalized:
+            continue
+        key = normalized.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        output.append(normalized)
+    return output or [original_query]
+
+
+def _dedupe_records(records: list[_ChunkRecord], *, score_key: str) -> list[_ChunkRecord]:
+    best: dict[int, _ChunkRecord] = {}
+    for record in records:
+        current = best.get(record.id)
+        if current is None:
+            best[record.id] = record
+            continue
+        current_score = getattr(current, score_key) or 0.0
+        new_score = getattr(record, score_key) or 0.0
+        if new_score > current_score:
+            best[record.id] = record
+    output = list(best.values())
+    if score_key == "lexical_score":
+        output.sort(key=lambda item: (-float(item.lexical_score or 0.0), item.id))
+    else:
+        output.sort(key=lambda item: (-float(item.vector_score or 0.0), item.id))
+    return output
+
+
+async def _apply_planner_filters(
+    *,
+    session: AsyncSession,
+    base_filters: AskFilters,
+    suggested_filters: AskFilters,
+) -> AskFilters:
+    allowed_projects = await _load_allowed_ids(session, "project")
+    allowed_trackers = await _load_allowed_ids(session, "tracker")
+    allowed_statuses = await _load_allowed_ids(session, "issue_status")
+
+    suggested_project_ids = [
+        item for item in suggested_filters.project_ids if item in allowed_projects
+    ]
+    suggested_tracker_ids = [
+        item for item in suggested_filters.tracker_ids if item in allowed_trackers
+    ]
+    suggested_status_ids = [
+        item for item in suggested_filters.status_ids if item in allowed_statuses
+    ]
+
+    return AskFilters(
+        project_ids=base_filters.project_ids or suggested_project_ids,
+        tracker_ids=base_filters.tracker_ids or suggested_tracker_ids,
+        status_ids=base_filters.status_ids or suggested_status_ids,
+        from_date=base_filters.from_date or suggested_filters.from_date,
+        to_date=base_filters.to_date or suggested_filters.to_date,
+    )
+
+
+async def _load_allowed_ids(session: AsyncSession, table_name: str) -> set[int]:
+    try:
+        rows = (await session.execute(text(f"SELECT id FROM {table_name}"))).all()
+    except OperationalError:
+        return set()
+    allowed: set[int] = set()
+    for row in rows:
+        try:
+            allowed.add(int(row[0]))
+        except (TypeError, ValueError):
+            continue
+    return allowed
+
+
+def _filters_to_diagnostics(filters: AskFilters) -> dict[str, object]:
+    return {
+        "project_ids": list(filters.project_ids),
+        "tracker_ids": list(filters.tracker_ids),
+        "status_ids": list(filters.status_ids),
+        "from_date": filters.from_date.isoformat() if filters.from_date is not None else None,
+        "to_date": filters.to_date.isoformat() if filters.to_date is not None else None,
+    }
 
 
 async def _retrieve_lexical_candidates(

@@ -12,6 +12,8 @@ from redmine_rag.db.base import Base
 from redmine_rag.db.models import DocChunk, Issue
 from redmine_rag.db.session import get_engine, get_session_factory
 from redmine_rag.indexing.embedding_indexer import refresh_embeddings
+from redmine_rag.services import retrieval_service
+from redmine_rag.services.query_planner import RetrievalPlan, RetrievalPlanDiagnostics
 from redmine_rag.services.retrieval_service import fuse_rankings, hybrid_retrieve
 
 
@@ -307,3 +309,132 @@ async def test_hybrid_retrieve_uses_vector_candidates_when_embeddings_exist(
     assert first.diagnostics.vector_candidates > 0
     assert first.chunks
     assert [item.id for item in first.chunks] == [item.id for item in second.chunks]
+
+
+@pytest.mark.asyncio
+async def test_hybrid_retrieve_applies_planner_expansions_and_sanitizes_filters(
+    isolated_retrieval_db: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RETRIEVAL_PLANNER_ENABLED", "true")
+    get_settings.cache_clear()
+
+    async def _fake_plan(*_args, **_kwargs):
+        return (
+            RetrievalPlan(
+                normalized_query="idp handshake",
+                expansions=["single sign on federation"],
+                suggested_filters=AskFilters(
+                    project_ids=[999], tracker_ids=[999], status_ids=[999]
+                ),
+                confidence=0.8,
+            ),
+            RetrievalPlanDiagnostics(
+                planner_mode="llm",
+                planner_status="applied",
+                latency_ms=12,
+                normalized_query="idp handshake",
+                expansions=["single sign on federation"],
+                confidence=0.8,
+            ),
+        )
+
+    monkeypatch.setattr(retrieval_service, "build_retrieval_plan", _fake_plan)
+
+    now = datetime.now(UTC)
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        session.add(
+            DocChunk(
+                source_type="issue",
+                source_id="901",
+                project_id=1,
+                issue_id=901,
+                chunk_index=0,
+                text="single sign on federation outage follow-up",
+                url="http://x/issues/901",
+                source_created_on=now,
+                source_updated_on=now,
+                source_metadata={},
+                embedding_key="planner-901",
+            )
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        retrieval = await hybrid_retrieve(
+            session,
+            query="idp handshake",
+            filters=AskFilters(),
+            top_k=5,
+        )
+
+    assert retrieval.chunks
+    assert retrieval.chunks[0].source_id == "901"
+    assert retrieval.diagnostics.planner_status == "applied"
+    assert retrieval.diagnostics.planner_queries is not None
+    assert "single sign on federation" in retrieval.diagnostics.planner_queries
+    applied_filters = retrieval.diagnostics.planner_filters_applied or {}
+    assert applied_filters.get("project_ids") == []
+
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_hybrid_retrieve_falls_back_when_planner_fails(
+    isolated_retrieval_db: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RETRIEVAL_PLANNER_ENABLED", "true")
+    get_settings.cache_clear()
+
+    async def _failed_plan(*_args, **_kwargs):
+        return (
+            None,
+            RetrievalPlanDiagnostics(
+                planner_mode="llm",
+                planner_status="failed",
+                latency_ms=7,
+                normalized_query=None,
+                expansions=[],
+                confidence=None,
+                error="planner error",
+            ),
+        )
+
+    monkeypatch.setattr(retrieval_service, "build_retrieval_plan", _failed_plan)
+
+    now = datetime.now(UTC)
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        session.add(
+            DocChunk(
+                source_type="issue",
+                source_id="902",
+                project_id=1,
+                issue_id=902,
+                chunk_index=0,
+                text="callback timeout recovery procedure",
+                url="http://x/issues/902",
+                source_created_on=now,
+                source_updated_on=now,
+                source_metadata={},
+                embedding_key="planner-902",
+            )
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        retrieval = await hybrid_retrieve(
+            session,
+            query="callback timeout",
+            filters=AskFilters(),
+            top_k=5,
+        )
+
+    assert retrieval.chunks
+    assert retrieval.diagnostics.planner_status == "failed"
+    assert retrieval.diagnostics.planner_error == "planner error"
+    assert retrieval.diagnostics.planner_queries == ["callback timeout"]
+
+    get_settings.cache_clear()

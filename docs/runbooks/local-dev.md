@@ -94,6 +94,9 @@ export OLLAMA_MODEL=Mistral-7B-Instruct-v0.3-Q4_K_M
 export OLLAMA_TIMEOUT_S=45
 export OLLAMA_MAX_CONCURRENCY=2
 export ASK_ANSWER_MODE=llm_grounded
+export RETRIEVAL_PLANNER_ENABLED=true
+export RETRIEVAL_PLANNER_MAX_EXPANSIONS=3
+export RETRIEVAL_PLANNER_TIMEOUT_S=12
 ```
 
 Runtime readiness is visible in:
@@ -109,6 +112,11 @@ curl -X POST http://127.0.0.1:8000/v1/ask \
   -H 'content-type: application/json' \
   -d '{"query":"What is the login callback issue and rollback plan?","filters":{"project_ids":[1]},"top_k":5}'
 ```
+
+Planner notes:
+- planner output includes `normalized_query`, bounded `expansions`, and optional filter hints.
+- planner-suggested IDs are applied only if they exist in local DB domain tables.
+- if planner fails or returns invalid payload, retrieval falls back to original user query.
 
 Or via API:
 

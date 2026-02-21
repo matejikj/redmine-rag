@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     retrieval_vector_weight: float = 0.35
     retrieval_rrf_k: int = 60
     retrieval_candidate_multiplier: int = 4
+    retrieval_planner_enabled: bool = False
+    retrieval_planner_max_expansions: int = 3
+    retrieval_planner_timeout_s: float = 12.0
     ask_answer_mode: str = "deterministic"
     ask_llm_timeout_s: float = 20.0
     ask_llm_max_claims: int = 5
@@ -139,6 +142,7 @@ class Settings(BaseSettings):
         "embedding_dim",
         "retrieval_rrf_k",
         "retrieval_candidate_multiplier",
+        "retrieval_planner_max_expansions",
         "ask_llm_max_claims",
         "llm_extract_max_retries",
         "llm_extract_batch_size",
@@ -165,6 +169,7 @@ class Settings(BaseSettings):
         "redmine_http_timeout_s",
         "ollama_timeout_s",
         "ask_llm_timeout_s",
+        "retrieval_planner_timeout_s",
     )
     @classmethod
     def validate_non_negative_floats(cls, value: float) -> float:

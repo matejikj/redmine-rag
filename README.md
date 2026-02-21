@@ -87,6 +87,10 @@ make mock-redmine
 - supports synthesis modes via `ASK_ANSWER_MODE`:
   - `deterministic` (default)
   - `llm_grounded` (LLM-generated claims validated against citation snippets)
+- supports optional retrieval planner before hybrid retrieval:
+  - enable with `RETRIEVAL_PLANNER_ENABLED=true`
+  - planner emits normalized query + bounded expansions + candidate filter hints
+  - planner diagnostics are logged (`planner_mode`, `planner_latency_ms`, `planner_expansions`)
 
 Deterministic extraction:
 - `POST /v1/extract/properties` computes `issue_metric` + `issue_property` with extractor version `det-v1`.
@@ -128,6 +132,9 @@ export LLM_EXTRACT_ENABLED=true
 export OLLAMA_BASE_URL=http://127.0.0.1:11434
 export OLLAMA_MODEL=Mistral-7B-Instruct-v0.3-Q4_K_M
 export ASK_ANSWER_MODE=llm_grounded
+export RETRIEVAL_PLANNER_ENABLED=true
+export RETRIEVAL_PLANNER_MAX_EXPANSIONS=3
+export RETRIEVAL_PLANNER_TIMEOUT_S=12
 ```
 
 Metrics summary endpoint:
@@ -164,6 +171,9 @@ RETRIEVAL_LEXICAL_WEIGHT=0.65
 RETRIEVAL_VECTOR_WEIGHT=0.35
 RETRIEVAL_RRF_K=60
 RETRIEVAL_CANDIDATE_MULTIPLIER=4
+RETRIEVAL_PLANNER_ENABLED=false
+RETRIEVAL_PLANNER_MAX_EXPANSIONS=3
+RETRIEVAL_PLANNER_TIMEOUT_S=12
 ```
 
 - `REDMINE_MODULES`: registry toggle for sync pipeline modules.

@@ -1,0 +1,82 @@
+{
+  "name": "retrieval_planner_v1",
+  "type": "object",
+  "required": [
+    "normalized_query",
+    "expansions",
+    "filters",
+    "confidence"
+  ],
+  "properties": {
+    "normalized_query": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 600
+    },
+    "expansions": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      }
+    },
+    "filters": {
+      "type": "object",
+      "required": [
+        "project_ids",
+        "tracker_ids",
+        "status_ids",
+        "from_date",
+        "to_date"
+      ],
+      "properties": {
+        "project_ids": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "tracker_ids": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "status_ids": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "from_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "to_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0
+    }
+  },
+  "additionalProperties": false
+}

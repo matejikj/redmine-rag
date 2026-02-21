@@ -134,6 +134,15 @@ async def answer_question(payload: AskRequest) -> AskResponse:
             "fused_candidates": retrieval.diagnostics.fused_candidates,
             "used_chunk_ids": [chunk.id for chunk in chunks],
             "ask_answer_mode": settings.ask_answer_mode,
+            "planner_mode": retrieval.diagnostics.planner_mode,
+            "planner_status": retrieval.diagnostics.planner_status,
+            "planner_latency_ms": retrieval.diagnostics.planner_latency_ms,
+            "planner_normalized_query": retrieval.diagnostics.planner_normalized_query,
+            "planner_expansions": retrieval.diagnostics.planner_expansions,
+            "planner_confidence": retrieval.diagnostics.planner_confidence,
+            "planner_queries": retrieval.diagnostics.planner_queries,
+            "planner_filters_applied": retrieval.diagnostics.planner_filters_applied,
+            "planner_error": retrieval.diagnostics.planner_error,
         },
     )
 
@@ -184,6 +193,9 @@ async def answer_question(payload: AskRequest) -> AskResponse:
             "citations_count": len(citations),
             "used_chunk_ids": [chunk.id for chunk in chunks],
             "synthesis_mode": synthesis_mode,
+            "planner_mode": retrieval.diagnostics.planner_mode,
+            "planner_status": retrieval.diagnostics.planner_status,
+            "planner_queries": retrieval.diagnostics.planner_queries,
         },
     )
 

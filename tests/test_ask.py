@@ -363,6 +363,9 @@ async def test_ask_logs_retrieval_metadata(
     )
     assert retrieval_log.retrieval_mode == "hybrid"
     assert retrieval_log.used_chunk_ids == [401]
+    assert retrieval_log.planner_mode == "disabled"
+    assert retrieval_log.planner_status == "disabled"
+    assert retrieval_log.planner_queries is None
 
     validation_log = next(
         record for record in caplog.records if record.message == "Ask claim validation finished"

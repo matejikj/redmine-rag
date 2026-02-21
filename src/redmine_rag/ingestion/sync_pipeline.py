@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 from redmine_rag.core.config import get_settings
@@ -33,7 +33,7 @@ async def run_incremental_sync(project_ids: list[int]) -> dict[str, Any]:
         "journals_synced": 0,
         "wiki_pages_synced": 0,
         "chunks_updated": 0,
-        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "finished_at": datetime.now(UTC).isoformat(),
     }
 
     logger.info("Finished incremental Redmine sync", extra=summary)

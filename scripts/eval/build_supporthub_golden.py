@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-
 OUTPUT_PATH = Path("evals/supporthub_golden_v1.jsonl")
 
 
@@ -90,7 +89,8 @@ def build_queries() -> list[dict[str, object]]:
             ),
             make_query(
                 "gq-002",
-                "What is the root cause path for Safari callback timeout and what evidence supports it?",
+                "What is the root cause path for Safari callback timeout "
+                "and what evidence supports it?",
                 "root_cause_summary",
                 [issue(102), journal(102, 1003), message(95003), file_ref(93001)],
                 difficulty="basic",
@@ -179,7 +179,8 @@ def build_queries() -> list[dict[str, object]]:
         queries.append(
             make_query(
                 f"gq-{idx:03d}",
-                f"Why was issue #{issue_id} reopened and what evidence supports the false closure path?",
+                f"Why was issue #{issue_id} reopened and what evidence supports "
+                "the false closure path?",
                 "incident_timeline",
                 [
                     issue(issue_id),
@@ -214,7 +215,8 @@ def build_queries() -> list[dict[str, object]]:
         queries.append(
             make_query(
                 f"gq-{idx:03d}",
-                f"Assess priority inconsistency for issue #{issue_id} and recommend priority correction.",
+                f"Assess priority inconsistency for issue #{issue_id} "
+                "and recommend priority correction.",
                 "risk_assessment",
                 [
                     issue(issue_id),
@@ -252,7 +254,8 @@ def build_queries() -> list[dict[str, object]]:
         queries.append(
             make_query(
                 f"gq-{idx:03d}",
-                f"Analyze SLA behavior around issue #{issue_id} and identify breach/near-breach indicators.",
+                f"Analyze SLA behavior around issue #{issue_id} "
+                "and identify breach/near-breach indicators.",
                 "sla_analysis",
                 [
                     issue(issue_id),
@@ -268,14 +271,70 @@ def build_queries() -> list[dict[str, object]]:
 
     # Knowledge and communication centric questions (37-44)
     knowledge_specs = [
-        ("gq-037", "Které wiki a dokumenty nejlépe vysvětlují citation quality proces?", "Citation-Quality-Checklist-5", 92101, 91102, 96008),
-        ("gq-038", "Summarize incident review narrative across news, documents, and ops threads.", "Root-Cause-Catalog-3", 92105, 91104, 96010),
-        ("gq-039", "Jak se promítla architecture decision do operativních threadů?", "Evidence-Timeline-FAQ-2", 92107, 91103, 96000),
-        ("gq-040", "What sources justify process changes in support workflow calibration?", "Escalation-Policy-4", 92109, 91102, 96014),
-        ("gq-041", "Najdi podklady pro release readiness a rollback governance.", "SLA-Metrics-Guide-1", 92100, 91100, 95001),
-        ("gq-042", "Which communication threads document decision points for module tradeoffs?", "Evidence-Timeline-FAQ-7", 92111, 91106, 96006),
-        ("gq-043", "Kde je vidět propojení files -> wiki -> documents u evidence chain?", "Reporting-Citations", 92002, 91107, 96012),
-        ("gq-044", "Provide a grounded communication summary for architecture vs ops follow-ups.", "Citation-Quality-Checklist-10", 92113, 91108, 96018),
+        (
+            "gq-037",
+            "Které wiki a dokumenty nejlépe vysvětlují citation quality proces?",
+            "Citation-Quality-Checklist-5",
+            92101,
+            91102,
+            96008,
+        ),
+        (
+            "gq-038",
+            "Summarize incident review narrative across news, documents, and ops threads.",
+            "Root-Cause-Catalog-3",
+            92105,
+            91104,
+            96010,
+        ),
+        (
+            "gq-039",
+            "Jak se promítla architecture decision do operativních threadů?",
+            "Evidence-Timeline-FAQ-2",
+            92107,
+            91103,
+            96000,
+        ),
+        (
+            "gq-040",
+            "What sources justify process changes in support workflow calibration?",
+            "Escalation-Policy-4",
+            92109,
+            91102,
+            96014,
+        ),
+        (
+            "gq-041",
+            "Najdi podklady pro release readiness a rollback governance.",
+            "SLA-Metrics-Guide-1",
+            92100,
+            91100,
+            95001,
+        ),
+        (
+            "gq-042",
+            "Which communication threads document decision points for module tradeoffs?",
+            "Evidence-Timeline-FAQ-7",
+            92111,
+            91106,
+            96006,
+        ),
+        (
+            "gq-043",
+            "Kde je vidět propojení files -> wiki -> documents u evidence chain?",
+            "Reporting-Citations",
+            92002,
+            91107,
+            96012,
+        ),
+        (
+            "gq-044",
+            "Provide a grounded communication summary for architecture vs ops follow-ups.",
+            "Citation-Quality-Checklist-10",
+            92113,
+            91108,
+            96018,
+        ),
     ]
     for query_id, text, wiki_title, doc_id, news_id, message_id in knowledge_specs:
         queries.append(

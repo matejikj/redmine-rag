@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import argparse
-from collections import Counter
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any
-
 
 DEFAULT_DATASET = Path("evals/supporthub_golden_v1.jsonl")
 
@@ -13,7 +12,9 @@ DEFAULT_DATASET = Path("evals/supporthub_golden_v1.jsonl")
 def _load_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         raise SystemExit(f"Missing file: {path}")
-    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    rows = [
+        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+    ]
     if not rows:
         raise SystemExit(f"Empty JSONL file: {path}")
     return rows
@@ -45,7 +46,9 @@ def _validate_dataset(rows: list[dict[str, Any]]) -> None:
             raise SystemExit(f"Query {row['id']} has empty expected_sources")
         for source in row["expected_sources"]:
             if "source_type" not in source:
-                raise SystemExit(f"Query {row['id']} has malformed source without source_type: {source}")
+                raise SystemExit(
+                    f"Query {row['id']} has malformed source without source_type: {source}"
+                )
 
 
 def _print_dataset_summary(rows: list[dict[str, Any]]) -> None:

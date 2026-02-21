@@ -9,7 +9,7 @@ def to_citations(chunks: list[RetrievedChunk], snippet_length: int = 220) -> lis
     for idx, chunk in enumerate(chunks, start=1):
         snippet = chunk.text.strip().replace("\n", " ")
         if len(snippet) > snippet_length:
-            snippet = f"{snippet[:snippet_length - 3]}..."
+            snippet = f"{snippet[: snippet_length - 3]}..."
         citations.append(
             Citation(
                 id=idx,

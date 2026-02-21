@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 
@@ -80,4 +81,4 @@ class LocalNumpyVectorStore:
         norm = np.linalg.norm(vector)
         if norm == 0:
             return vector
-        return vector / norm
+        return cast(np.ndarray, vector / norm)

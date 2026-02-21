@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
-import os
-from typing import Any, Iterable
+from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 
@@ -12,9 +13,9 @@ from redmine_rag.mock_redmine.fixtures import (
     DOCUMENTS,
     FILES,
     GROUPS,
-    ISSUES,
     ISSUE_PRIORITIES,
     ISSUE_STATUSES,
+    ISSUES,
     MESSAGES,
     NEWS,
     PROJECTS,

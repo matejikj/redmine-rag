@@ -26,10 +26,16 @@ async def answer_question(payload: AskRequest) -> AskResponse:
     lines: list[str] = ["### Shrnutí na základě Redmine zdrojů", ""]
 
     for citation in citations[: min(5, len(citations))]:
-        lines.append(f"- Zdroj {citation.id}: pravděpodobně relevantní vlastnosti jsou popsány v [{citation.source_type} #{citation.source_id}]({citation.url}).")
+        lines.append(
+            f"- Zdroj {citation.id}: pravděpodobně relevantní vlastnosti jsou popsány v "
+            f"[{citation.source_type} #{citation.source_id}]({citation.url})."
+        )
 
     lines.append("")
-    lines.append("Další detail je potřeba potvrdit po doplnění extrakce vlastností (`/v1/extract/properties`).")
+    lines.append(
+        "Další detail je potřeba potvrdit po doplnění extrakce vlastností "
+        "(`/v1/extract/properties`)."
+    )
 
     return AskResponse(
         answer_markdown="\n".join(lines),

@@ -16,7 +16,7 @@ Use:
 - SQLite + FTS5 for source-of-truth and lexical search
 - local vector abstraction (`numpy` baseline) with pluggable backend
 - Alembic for schema migration
-- `uv`, `ruff`, `mypy`, `pytest`, `pre-commit` for engineering quality
+- `venv`, `pip`, `ruff`, `mypy`, `pytest`, `pre-commit` for engineering quality
 
 ## Consequences
 

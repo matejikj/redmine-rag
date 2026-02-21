@@ -8,6 +8,8 @@ make bootstrap
 make migrate
 ```
 
+`make bootstrap` recreates `.venv` with `python -m venv` and installs dev dependencies via `pip`.
+
 ## Start API
 
 ```bash

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import logging
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import BackgroundTasks
@@ -43,19 +43,19 @@ async def _run_sync_job(job_id: str) -> None:
             return
 
         job.status = "running"
-        job.started_at = datetime.now(timezone.utc)
+        job.started_at = datetime.now(UTC)
         await session.commit()
 
         try:
             project_ids = list(job.payload.get("project_ids", []))
             summary = await run_incremental_sync(project_ids=project_ids)
             job.status = "finished"
-            job.finished_at = datetime.now(timezone.utc)
+            job.finished_at = datetime.now(UTC)
             job.payload = {**job.payload, "summary": summary}
             await session.commit()
         except Exception as exc:  # noqa: BLE001
             job.status = "failed"
-            job.finished_at = datetime.now(timezone.utc)
+            job.finished_at = datetime.now(UTC)
             job.error_message = str(exc)
             await session.commit()
             logger.exception("Sync job failed", extra={"job_id": job_id})

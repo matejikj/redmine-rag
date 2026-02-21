@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy src
-uv run pytest
-uv run python scripts/eval/check_mock_dataset_quality.py --all-profiles
+if [[ -x ".venv/bin/python" ]]; then
+  PYTHON_BIN=".venv/bin/python"
+else
+  PYTHON_BIN="${PYTHON_BIN:-python3}"
+fi
+
+"${PYTHON_BIN}" -m ruff check .
+"${PYTHON_BIN}" -m ruff format --check .
+"${PYTHON_BIN}" -m mypy src
+"${PYTHON_BIN}" -m pytest
+"${PYTHON_BIN}" scripts/eval/check_mock_dataset_quality.py --all-profiles

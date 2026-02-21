@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
-import re
 
 from sqlalchemy import Select, select
 from sqlalchemy.exc import OperationalError
@@ -54,7 +54,7 @@ async def hybrid_retrieve(
 
     for row in rows:
         text_lower = row.text.lower()
-        score = sum(text_lower.count(term) for term in terms)
+        score = float(sum(text_lower.count(term) for term in terms))
         if score <= 0:
             continue
         if row.source_updated_on is not None:

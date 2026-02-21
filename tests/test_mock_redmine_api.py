@@ -126,7 +126,9 @@ def test_role_based_assignment_and_handoff_trace() -> None:
     assert private_payload["assigned_to"]["id"] in {6, 18}
     assert normal_payload["assigned_to"]["id"] in {2, 10, 15}
 
-    journal_user_ids = {item["user"]["id"] for item in normal_payload["journals"] if item.get("user")}
+    journal_user_ids = {
+        item["user"]["id"] for item in normal_payload["journals"] if item.get("user")
+    }
     assert len(journal_user_ids) >= 2
 
 
@@ -139,9 +141,7 @@ def test_issue_backlog_status_dependency_and_class_mix() -> None:
     assert {"New", "In Progress", "Resolved", "Closed", "Reopened"} <= status_names
 
     relation_types = {
-        relation["relation_type"]
-        for issue in issues
-        for relation in issue.get("relations", [])
+        relation["relation_type"] for issue in issues for relation in issue.get("relations", [])
     }
     assert {"blocks", "relates", "duplicates"} <= relation_types
 
@@ -187,9 +187,7 @@ def test_journal_comment_style_mix_and_non_generic_content() -> None:
         if journal.get("notes")
     ]
     private_note_values = [
-        journal["private_notes"]
-        for issue in bulk_issues
-        for journal in issue.get("journals", [])
+        journal["private_notes"] for issue in bulk_issues for journal in issue.get("journals", [])
     ]
 
     assert any(note.startswith("Operational update:") for note in notes)
@@ -294,7 +292,10 @@ def test_time_effort_distribution_is_plausible_by_class_and_status() -> None:
         if status_name == "New":
             new_hours.append(total_hours)
 
-    assert incident_hours and support_hours and closed_hours and new_hours
+    assert incident_hours
+    assert support_hours
+    assert closed_hours
+    assert new_hours
     assert (sum(incident_hours) / len(incident_hours)) > (sum(support_hours) / len(support_hours))
     assert (sum(closed_hours) / len(closed_hours)) > (sum(new_hours) / len(new_hours))
 
@@ -357,7 +358,11 @@ def test_noisy_issue_profiles_are_present_but_controlled() -> None:
 
     data_quality_flags = [
         next(
-            (field["value"] for field in issue["custom_fields"] if field["name"] == "Data Quality Flag"),
+            (
+                field["value"]
+                for field in issue["custom_fields"]
+                if field["name"] == "Data Quality Flag"
+            ),
             "Clean",
         )
         for issue in bulk_issues
@@ -383,7 +388,8 @@ def test_noisy_issue_profiles_are_present_but_controlled() -> None:
     assert inconsistent_priority >= 3
 
     assert all(
-        any(field["name"] == "Issue Class" for field in issue["custom_fields"]) for issue in bulk_issues
+        any(field["name"] == "Issue Class" for field in issue["custom_fields"])
+        for issue in bulk_issues
     )
 
 
@@ -405,9 +411,9 @@ def test_noisy_language_and_legacy_artifacts_across_entities() -> None:
     ]
     files = client.get("/files.json", params={"limit": 100}, headers=ADMIN_HEADERS).json()["files"]
 
-    topics = client.get("/boards/94003/topics.json", params={"limit": 20}, headers=AUTH_HEADERS).json()[
-        "messages"
-    ]
+    topics = client.get(
+        "/boards/94003/topics.json", params={"limit": 20}, headers=AUTH_HEADERS
+    ).json()["messages"]
     thread_samples = topics[:6]
     thread_messages = [
         client.get(f"/messages/{topic['id']}.json", headers=AUTH_HEADERS).json()["message"]
@@ -559,7 +565,9 @@ def test_communication_threads_have_links_and_decision_points() -> None:
     assert any("architecture review" in topic["subject"].lower() for topic in ops_topics)
     assert any("ops review" in topic["subject"].lower() for topic in ops_topics)
 
-    topic_ids = [topic["id"] for topic in arch_topics[:2]] + [topic["id"] for topic in ops_topics[:6]]
+    topic_ids = [topic["id"] for topic in arch_topics[:2]] + [
+        topic["id"] for topic in ops_topics[:6]
+    ]
     details = [
         client.get(f"/messages/{message_id}.json", headers=AUTH_HEADERS).json()["message"]
         for message_id in topic_ids
@@ -573,7 +581,9 @@ def test_communication_threads_have_links_and_decision_points() -> None:
     assert "issue #" in combined_content
     assert "document #" in combined_content
     assert "decision point" in combined_content or "decision:" in combined_content
-    assert any(len(message["replies"]) >= 1 for message in details if message["board"]["id"] == 94003)
+    assert any(
+        len(message["replies"]) >= 1 for message in details if message["board"]["id"] == 94003
+    )
 
 
 def test_private_security_board_content_for_admin() -> None:

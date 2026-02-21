@@ -16,7 +16,7 @@ Agent-first platform for retrieving Redmine knowledge (issues, journals, wiki), 
 - Vectors: local index abstraction (`numpy` baseline, pluggable backend)
 - Migrations: Alembic
 - Worker: lightweight async scheduler/CLI jobs
-- Tooling: `uv`, `ruff`, `mypy`, `pytest`, `pre-commit`
+- Tooling: `venv`, `pip`, `ruff`, `mypy`, `pytest`, `pre-commit`
 
 ## Quick start
 
@@ -26,6 +26,8 @@ make bootstrap
 make migrate
 make dev
 ```
+
+`make bootstrap` creates `.venv`, installs dependencies with `pip`, and sets git hooks.
 
 Open `http://127.0.0.1:8000/docs`.
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, BackgroundTasks
 
@@ -29,7 +29,7 @@ async def healthz() -> HealthResponse:
         status="ok",
         app=settings.app_name,
         version=__version__,
-        utc_time=datetime.now(timezone.utc),
+        utc_time=datetime.now(UTC),
     )
 
 

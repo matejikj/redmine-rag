@@ -1,4 +1,5 @@
 set shell := ["bash", "-cu"]
+python := `if [ -x .venv/bin/python ]; then echo .venv/bin/python; else echo python3; fi`
 
 default:
   @just --list
@@ -10,28 +11,28 @@ dev:
   ./scripts/dev.sh
 
 migrate:
-  uv run alembic upgrade head
+  {{python}} -m alembic upgrade head
 
 format:
-  uv run ruff format .
+  {{python}} -m ruff format .
 
 lint:
-  uv run ruff check .
+  {{python}} -m ruff check .
 
 typecheck:
-  uv run mypy src
+  {{python}} -m mypy src
 
 test:
-  uv run pytest
+  {{python}} -m pytest
 
 check:
   ./scripts/check.sh
 
 sync:
-  uv run redmine-rag sync run
+  {{python}} -m redmine_rag.cli sync run
 
 eval:
-  python3 scripts/eval/run_eval.py
+  {{python}} scripts/eval/run_eval.py
 
 mock-redmine:
   ./scripts/mock-redmine.sh

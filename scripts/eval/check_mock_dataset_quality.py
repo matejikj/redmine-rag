@@ -70,11 +70,15 @@ def _validate_profile(profile: str) -> tuple[dict[str, Any], list[str]]:
     for key, expected in expected_counts.items():
         observed = observed_counts[key]
         if observed != expected:
-            errors.append(f"{profile}: count mismatch for {key}: expected {expected}, got {observed}")
+            errors.append(
+                f"{profile}: count mismatch for {key}: expected {expected}, got {observed}"
+            )
 
     if len(bulk_issues) != int(fx.PROFILE_SETTINGS["bulk_issues"]):
+        expected_bulk_issues = int(fx.PROFILE_SETTINGS["bulk_issues"])
         errors.append(
-            f"{profile}: bulk issue count mismatch expected {fx.PROFILE_SETTINGS['bulk_issues']} got {len(bulk_issues)}"
+            f"{profile}: bulk issue count mismatch expected {expected_bulk_issues} "
+            f"got {len(bulk_issues)}"
         )
 
     if len({issue["id"] for issue in issues}) != len(issues):
@@ -95,28 +99,34 @@ def _validate_profile(profile: str) -> tuple[dict[str, Any], list[str]]:
         for relation in issue.get("relations", [])
     }
     if not {"blocks", "relates", "duplicates"}.issubset(relation_types):
-        errors.append(
-            f"{profile}: relation type coverage incomplete {sorted({'blocks', 'relates', 'duplicates'} - relation_types)}"
-        )
+        missing_relation_types = sorted({"blocks", "relates", "duplicates"} - relation_types)
+        errors.append(f"{profile}: relation type coverage incomplete {missing_relation_types}")
 
     for issue in issues:
         for relation in issue.get("relations", []):
             if int(relation["issue_id"]) not in issue_ids:
                 errors.append(
-                    f"{profile}: issue {issue['id']} relation points to missing issue {relation['issue_id']}"
+                    f"{profile}: issue {issue['id']} relation points to missing issue "
+                    f"{relation['issue_id']}"
                 )
 
     for entry in time_entries:
         if int(entry["issue_id"]) not in issue_ids:
-            errors.append(f"{profile}: time entry {entry['id']} points to missing issue {entry['issue_id']}")
+            errors.append(
+                f"{profile}: time entry {entry['id']} points to missing issue {entry['issue_id']}"
+            )
         if int(entry["user_id"]) not in user_ids:
-            errors.append(f"{profile}: time entry {entry['id']} points to missing user {entry['user_id']}")
+            errors.append(
+                f"{profile}: time entry {entry['id']} points to missing user {entry['user_id']}"
+            )
 
     for issue in bulk_issues:
         if _custom_field(issue, "Data Quality Flag") is None:
             errors.append(f"{profile}: issue {issue['id']} missing Data Quality Flag")
 
-    data_quality_flags = [str(_custom_field(issue, "Data Quality Flag", "Clean")) for issue in bulk_issues]
+    data_quality_flags = [
+        str(_custom_field(issue, "Data Quality Flag", "Clean")) for issue in bulk_issues
+    ]
     noisy_count = sum(flag != "Clean" for flag in data_quality_flags)
     min_noisy = max(10, len(bulk_issues) // 12)
     if noisy_count < min_noisy:
@@ -149,7 +159,9 @@ def _validate_profile(profile: str) -> tuple[dict[str, Any], list[str]]:
         if board_id not in board_by_id:
             errors.append(f"{profile}: message {message['id']} points to missing board {board_id}")
         if int(message["author_id"]) not in user_ids:
-            errors.append(f"{profile}: message {message['id']} points to missing user {message['author_id']}")
+            errors.append(
+                f"{profile}: message {message['id']} points to missing user {message['author_id']}"
+            )
 
     observed_counts.update(
         {
@@ -157,14 +169,13 @@ def _validate_profile(profile: str) -> tuple[dict[str, Any], list[str]]:
             "noisy_issues": noisy_count,
             "missing_workflow_stage": missing_workflow_stage,
             "risk_flag_counts": dict(risk_counter),
-            "relation_type_counts": {
-                key: value
-                for key, value in Counter(
+            "relation_type_counts": dict(
+                Counter(
                     relation["relation_type"]
                     for issue in bulk_issues
                     for relation in issue.get("relations", [])
-                ).items()
-            },
+                )
+            ),
         }
     )
 

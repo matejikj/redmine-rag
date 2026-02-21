@@ -6,8 +6,8 @@ Create Date: 2026-02-21 12:00:00
 
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "20260221_0001"
@@ -27,8 +27,18 @@ def upgrade() -> None:
         sa.Column("updated_on", sa.DateTime(timezone=True), nullable=True),
         sa.Column("fetched_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("payload", sa.JSON(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
         sa.UniqueConstraint("entity_type", "entity_id", "endpoint", name="uq_raw_entity_key"),
     )
     op.create_index("ix_raw_entity_entity_type", "raw_entity", ["entity_type"])
@@ -43,8 +53,18 @@ def upgrade() -> None:
         sa.Column("updated_on", sa.DateTime(timezone=True), nullable=False),
         sa.Column("fetched_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("payload", sa.JSON(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_raw_issue_project_id", "raw_issue", ["project_id"])
     op.create_index("ix_raw_issue_updated_on", "raw_issue", ["updated_on"])
@@ -56,8 +76,18 @@ def upgrade() -> None:
         sa.Column("created_on", sa.DateTime(timezone=True), nullable=False),
         sa.Column("fetched_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("payload", sa.JSON(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_raw_journal_issue_id", "raw_journal", ["issue_id"])
     op.create_index("ix_raw_journal_created_on", "raw_journal", ["created_on"])
@@ -70,8 +100,18 @@ def upgrade() -> None:
         sa.Column("updated_on", sa.DateTime(timezone=True), nullable=False),
         sa.Column("fetched_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("payload", sa.JSON(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_raw_wiki_project_id", "raw_wiki", ["project_id"])
     op.create_index("ix_raw_wiki_title", "raw_wiki", ["title"])
@@ -88,8 +128,18 @@ def upgrade() -> None:
         sa.Column("homepage", sa.String(length=1024), nullable=True),
         sa.Column("created_on", sa.DateTime(timezone=True), nullable=True),
         sa.Column("updated_on", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
         sa.UniqueConstraint("identifier", name="uq_project_identifier"),
     )
     op.create_index("ix_project_identifier", "project", ["identifier"])
@@ -111,8 +161,18 @@ def upgrade() -> None:
         sa.Column("last_login_on", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_on", sa.DateTime(timezone=True), nullable=True),
         sa.Column("updated_on", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
         sa.UniqueConstraint("login", name="uq_user_entity_login"),
     )
     op.create_index("ix_user_entity_login", "user_entity", ["login"])
@@ -124,8 +184,18 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("users_json", sa.JSON(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
         sa.UniqueConstraint("name", name="uq_group_entity_name"),
     )
     op.create_index("ix_group_entity_name", "group_entity", ["name"])
@@ -137,8 +207,18 @@ def upgrade() -> None:
         sa.Column("principal_type", sa.String(length=16), nullable=False),
         sa.Column("principal_id", sa.Integer(), nullable=False),
         sa.Column("roles_json", sa.JSON(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_membership_project_id", "membership", ["project_id"])
     op.create_index("ix_membership_principal_type", "membership", ["principal_type"])
@@ -150,8 +230,18 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=100), nullable=False),
         sa.Column("default_status_id", sa.Integer(), nullable=True),
         sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
         sa.UniqueConstraint("name", name="uq_tracker_name"),
     )
     op.create_index("ix_tracker_name", "tracker", ["name"])
@@ -162,8 +252,18 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=100), nullable=False),
         sa.Column("is_closed", sa.Boolean(), nullable=False, server_default=sa.text("0")),
         sa.Column("is_default", sa.Boolean(), nullable=False, server_default=sa.text("0")),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
         sa.UniqueConstraint("name", name="uq_issue_status_name"),
     )
     op.create_index("ix_issue_status_name", "issue_status", ["name"])
@@ -175,8 +275,18 @@ def upgrade() -> None:
         sa.Column("position", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("is_default", sa.Boolean(), nullable=False, server_default=sa.text("0")),
         sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
         sa.UniqueConstraint("name", name="uq_issue_priority_name"),
     )
     op.create_index("ix_issue_priority_name", "issue_priority", ["name"])
@@ -187,8 +297,18 @@ def upgrade() -> None:
         sa.Column("project_id", sa.Integer(), sa.ForeignKey("project.id"), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("assigned_to_id", sa.Integer(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
         sa.UniqueConstraint("project_id", "name", name="uq_issue_category_project_name"),
     )
     op.create_index("ix_issue_category_project_id", "issue_category", ["project_id"])
@@ -206,8 +326,18 @@ def upgrade() -> None:
         sa.Column("due_date", sa.Date(), nullable=True),
         sa.Column("effective_date", sa.Date(), nullable=True),
         sa.Column("wiki_page_title", sa.String(length=255), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
         sa.UniqueConstraint("project_id", "name", name="uq_version_project_name"),
     )
     op.create_index("ix_version_project_id", "version", ["project_id"])
@@ -226,8 +356,18 @@ def upgrade() -> None:
         sa.Column("visible", sa.Boolean(), nullable=False, server_default=sa.text("1")),
         sa.Column("roles_json", sa.JSON(), nullable=False),
         sa.Column("trackers_json", sa.JSON(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_custom_field_name", "custom_field", ["name"])
 
@@ -259,8 +399,18 @@ def upgrade() -> None:
         sa.Column("updated_on", sa.DateTime(timezone=True), nullable=False),
         sa.Column("closed_on", sa.DateTime(timezone=True), nullable=True),
         sa.Column("custom_fields", sa.JSON(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_issue_project_id", "issue", ["project_id"])
     op.create_index("ix_issue_tracker", "issue", ["tracker"])
@@ -285,8 +435,18 @@ def upgrade() -> None:
         sa.Column("private_notes", sa.Boolean(), nullable=False, server_default=sa.text("0")),
         sa.Column("created_on", sa.DateTime(timezone=True), nullable=False),
         sa.Column("details", sa.JSON(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_journal_issue_id", "journal", ["issue_id"])
     op.create_index("ix_journal_created_on", "journal", ["created_on"])
@@ -299,9 +459,21 @@ def upgrade() -> None:
         sa.Column("issue_to_id", sa.Integer(), sa.ForeignKey("issue.id"), nullable=False),
         sa.Column("relation_type", sa.String(length=64), nullable=False),
         sa.Column("delay", sa.Integer(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.UniqueConstraint("issue_from_id", "issue_to_id", "relation_type", name="uq_issue_relation_pair"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.UniqueConstraint(
+            "issue_from_id", "issue_to_id", "relation_type", name="uq_issue_relation_pair"
+        ),
     )
     op.create_index("ix_issue_relation_issue_from_id", "issue_relation", ["issue_from_id"])
     op.create_index("ix_issue_relation_issue_to_id", "issue_relation", ["issue_to_id"])
@@ -312,8 +484,18 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
         sa.Column("issue_id", sa.Integer(), sa.ForeignKey("issue.id"), nullable=False),
         sa.Column("user_id", sa.Integer(), sa.ForeignKey("user_entity.id"), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
         sa.UniqueConstraint("issue_id", "user_id", name="uq_issue_watcher"),
     )
     op.create_index("ix_issue_watcher_issue_id", "issue_watcher", ["issue_id"])
@@ -330,8 +512,18 @@ def upgrade() -> None:
         sa.Column("parent_title", sa.String(length=255), nullable=True),
         sa.Column("updated_on", sa.DateTime(timezone=True), nullable=False),
         sa.Column("url", sa.String(length=1024), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
         sa.UniqueConstraint("project_id", "title", name="uq_wiki_page_project_title"),
     )
     op.create_index("ix_wiki_page_project_id", "wiki_page", ["project_id"])
@@ -348,8 +540,18 @@ def upgrade() -> None:
         sa.Column("comments", sa.Text(), nullable=True),
         sa.Column("text", sa.Text(), nullable=True),
         sa.Column("updated_on", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
         sa.UniqueConstraint("wiki_page_id", "version", name="uq_wiki_version"),
     )
     op.create_index("ix_wiki_version_wiki_page_id", "wiki_version", ["wiki_page_id"])
@@ -368,8 +570,18 @@ def upgrade() -> None:
         sa.Column("spent_on", sa.Date(), nullable=True),
         sa.Column("created_on", sa.DateTime(timezone=True), nullable=True),
         sa.Column("updated_on", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_time_entry_project_id", "time_entry", ["project_id"])
     op.create_index("ix_time_entry_issue_id", "time_entry", ["issue_id"])
@@ -400,8 +612,18 @@ def upgrade() -> None:
         sa.Column("author_id", sa.Integer(), nullable=True),
         sa.Column("created_on", sa.DateTime(timezone=True), nullable=True),
         sa.Column("digest", sa.String(length=255), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_attachment_container_type", "attachment", ["container_type"])
     op.create_index("ix_attachment_container_id", "attachment", ["container_id"])
@@ -425,8 +647,18 @@ def upgrade() -> None:
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("author_id", sa.Integer(), nullable=True),
         sa.Column("created_on", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_news_project_id", "news", ["project_id"])
     op.create_index("ix_news_title", "news", ["title"])
@@ -441,8 +673,18 @@ def upgrade() -> None:
         sa.Column("title", sa.String(length=512), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("created_on", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_document_project_id", "document", ["project_id"])
     op.create_index("ix_document_category_id", "document", ["category_id"])
@@ -458,8 +700,18 @@ def upgrade() -> None:
         sa.Column("position", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("topics_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("messages_count", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_board_project_id", "board", ["project_id"])
     op.create_index("ix_board_name", "board", ["name"])
@@ -478,8 +730,18 @@ def upgrade() -> None:
         sa.Column("sticky", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("created_on", sa.DateTime(timezone=True), nullable=True),
         sa.Column("updated_on", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_message_board_id", "message", ["board_id"])
     op.create_index("ix_message_parent_id", "message", ["parent_id"])
@@ -493,10 +755,22 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
         sa.Column("customized_type", sa.String(length=64), nullable=False),
         sa.Column("customized_id", sa.String(length=128), nullable=False),
-        sa.Column("custom_field_id", sa.Integer(), sa.ForeignKey("custom_field.id"), nullable=False),
+        sa.Column(
+            "custom_field_id", sa.Integer(), sa.ForeignKey("custom_field.id"), nullable=False
+        ),
         sa.Column("value", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_custom_value_customized_type", "custom_value", ["customized_type"])
     op.create_index("ix_custom_value_customized_id", "custom_value", ["customized_id"])
@@ -523,9 +797,21 @@ def upgrade() -> None:
         sa.Column("source_updated_on", sa.DateTime(timezone=True), nullable=True),
         sa.Column("source_metadata", sa.JSON(), nullable=False),
         sa.Column("embedding_key", sa.String(length=128), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.UniqueConstraint("source_type", "source_id", "chunk_index", name="uq_doc_chunk_source_idx"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.UniqueConstraint(
+            "source_type", "source_id", "chunk_index", name="uq_doc_chunk_source_idx"
+        ),
         sa.UniqueConstraint("embedding_key", name="uq_doc_chunk_embedding_key"),
     )
     op.create_index("ix_doc_chunk_source_type", "doc_chunk", ["source_type"])
@@ -549,8 +835,18 @@ def upgrade() -> None:
         sa.Column("reopen_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("touch_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("handoff_count", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
 
     op.create_table(
@@ -560,8 +856,18 @@ def upgrade() -> None:
         sa.Column("confidence", sa.Float(), nullable=False, server_default="0"),
         sa.Column("props_json", sa.JSON(), nullable=False),
         sa.Column("extracted_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_issue_property_extracted_at", "issue_property", ["extracted_at"])
 
@@ -573,8 +879,18 @@ def upgrade() -> None:
         sa.Column("last_success_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("cursor_token", sa.String(length=255), nullable=True),
         sa.Column("error_message", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
 
     op.create_table(
@@ -583,8 +899,18 @@ def upgrade() -> None:
         sa.Column("last_sync_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_success_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_error", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
 
     op.create_table(
@@ -595,8 +921,18 @@ def upgrade() -> None:
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("error_message", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_sync_job_status", "sync_job", ["status"])
 

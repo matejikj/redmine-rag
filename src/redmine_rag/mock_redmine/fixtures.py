@@ -1,8 +1,23 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
+from typing import Any, TypedDict
 
-PROJECTS = [
+
+class Workstream(TypedDict):
+    name: str
+    goal: str
+    modules: list[str]
+
+
+class OwnershipPools(TypedDict):
+    author_pool: list[int]
+    assignee_pool: list[int]
+    watcher_pool: list[int]
+
+
+PROJECTS: list[dict[str, Any]] = [
     {
         "id": 1,
         "identifier": "platform-core",
@@ -18,7 +33,7 @@ PROJECTS = [
     },
 ]
 
-USERS = [
+USERS: list[dict[str, Any]] = [
     {
         "id": 1,
         "login": "alice.smith",
@@ -301,7 +316,7 @@ USERS = [
     },
 ]
 
-GROUPS = [
+GROUPS: list[dict[str, Any]] = [
     {"id": 11, "name": "SupportHub Incident Command", "user_ids": [2, 10, 15, 17]},
     {"id": 12, "name": "SupportHub Identity Squad", "user_ids": [1, 6, 13, 18]},
     {"id": 13, "name": "SupportHub SLA Automation", "user_ids": [2, 8, 10, 15]},
@@ -311,13 +326,13 @@ GROUPS = [
     {"id": 17, "name": "SupportHub Product Council", "user_ids": [3, 7, 14, 19]},
 ]
 
-TRACKERS = [
+TRACKERS: list[dict[str, Any]] = [
     {"id": 1, "name": "Bug", "default_status_id": 1, "description": "Defect"},
     {"id": 2, "name": "Feature", "default_status_id": 1, "description": "Feature request"},
     {"id": 3, "name": "Support", "default_status_id": 2, "description": "Support ticket"},
 ]
 
-ISSUE_STATUSES = [
+ISSUE_STATUSES: list[dict[str, Any]] = [
     {"id": 1, "name": "New", "is_closed": False, "is_default": True},
     {"id": 2, "name": "In Progress", "is_closed": False, "is_default": False},
     {"id": 3, "name": "Resolved", "is_closed": False, "is_default": False},
@@ -325,14 +340,14 @@ ISSUE_STATUSES = [
     {"id": 5, "name": "Closed", "is_closed": True, "is_default": False},
 ]
 
-ISSUE_PRIORITIES = [
+ISSUE_PRIORITIES: list[dict[str, Any]] = [
     {"id": 1, "name": "Low", "position": 1, "is_default": False, "active": True},
     {"id": 2, "name": "Normal", "position": 2, "is_default": True, "active": True},
     {"id": 3, "name": "High", "position": 3, "is_default": False, "active": True},
     {"id": 4, "name": "Urgent", "position": 4, "is_default": False, "active": True},
 ]
 
-ISSUES = [
+ISSUES: list[dict[str, Any]] = [
     {
         "id": 101,
         "project_id": 1,
@@ -398,9 +413,7 @@ ISSUES = [
                 "digest": "d41d8cd98f00b204e9800998ecf8427e",
             }
         ],
-        "relations": [
-            {"id": 7001, "issue_id": 102, "relation_type": "blocks", "delay": None}
-        ],
+        "relations": [{"id": 7001, "issue_id": 102, "relation_type": "blocks", "delay": None}],
         "watcher_user_ids": [1, 3],
         "child_ids": [103],
     },
@@ -543,7 +556,7 @@ ISSUES = [
     },
 ]
 
-TIME_ENTRIES = [
+TIME_ENTRIES: list[dict[str, Any]] = [
     {
         "id": 8101,
         "project_id": 1,
@@ -582,7 +595,7 @@ TIME_ENTRIES = [
     },
 ]
 
-WIKI_PAGES = [
+WIKI_PAGES: list[dict[str, Any]] = [
     {
         "project_id": 1,
         "project_identifier": "platform-core",
@@ -614,7 +627,8 @@ WIKI_PAGES = [
         "title": "Reporting-Citations",
         "text": (
             "Citation rendering describes source mapping for issue comments, "
-            "wiki paragraphs, and attachments. Example evidence chain: issue #201 -> wiki paragraph -> file export."
+            "wiki paragraphs, and attachments. Example evidence chain: "
+            "issue #201 -> wiki paragraph -> file export."
         ),
         "version": 1,
         "author_id": 1,
@@ -624,13 +638,15 @@ WIKI_PAGES = [
     },
 ]
 
-NEWS = [
+NEWS: list[dict[str, Any]] = [
     {
         "id": 91001,
         "project_id": 1,
         "title": "SupportHub auth hardening milestone",
         "summary": "Completed phase 1 hardening.",
-        "description": "PKCE and token rotation controls are now in staging, based on issues #101 and #102.",
+        "description": (
+            "PKCE and token rotation controls are now in staging, based on issues #101 and #102."
+        ),
         "author_id": 1,
         "created_on": "2026-02-15T08:00:00Z",
     },
@@ -639,13 +655,16 @@ NEWS = [
         "project_id": 1,
         "title": "Evidence timeline RFC published",
         "summary": "RFC draft available.",
-        "description": "Initial RFC for evidence timeline architecture is available with references to issue #201.",
+        "description": (
+            "Initial RFC for evidence timeline architecture is available "
+            "with references to issue #201."
+        ),
         "author_id": 2,
         "created_on": "2026-02-19T09:00:00Z",
     },
 ]
 
-DOCUMENTS = [
+DOCUMENTS: list[dict[str, Any]] = [
     {
         "id": 92001,
         "project_id": 1,
@@ -664,7 +683,7 @@ DOCUMENTS = [
     },
 ]
 
-FILES = [
+FILES: list[dict[str, Any]] = [
     {
         "id": 93001,
         "project_id": 1,
@@ -678,7 +697,7 @@ FILES = [
     }
 ]
 
-BOARDS = [
+BOARDS: list[dict[str, Any]] = [
     {
         "id": 94001,
         "project_id": 1,
@@ -701,7 +720,7 @@ BOARDS = [
     },
 ]
 
-MESSAGES = [
+MESSAGES: list[dict[str, Any]] = [
     {
         "id": 95001,
         "board_id": 94001,
@@ -728,7 +747,8 @@ MESSAGES = [
         "author_id": 2,
         "subject": "Re: OAuth rollout readiness",
         "content": (
-            "Monitoring alerts for callback errors are active; reference file #93001 and issue #102. "
+            "Monitoring alerts for callback errors are active; "
+            "reference file #93001 and issue #102. "
             "Follow-up owner confirmed release checkpoint."
         ),
         "replies_count": 0,
@@ -747,7 +767,8 @@ MESSAGES = [
         "subject": "Safari callback errors",
         "content": (
             "Collected browser logs and timings for issue #102. "
-            "Architecture decision pending between cookie policy update and callback retry strategy."
+            "Architecture decision pending between cookie policy update "
+            "and callback retry strategy."
         ),
         "replies_count": 0,
         "last_reply_id": None,
@@ -764,7 +785,8 @@ MESSAGES = [
         "author_id": 1,
         "subject": "Replay mitigation threat review",
         "content": (
-            "Restricted security findings and mitigations for issue #301 and incident class threads. "
+            "Restricted security findings and mitigations for issue #301 "
+            "and incident class threads. "
             "Decision: keep evidence trail private; update document #92101 with approved controls."
         ),
         "replies_count": 0,
@@ -781,7 +803,7 @@ def _day_str(base_day: int, offset: int, max_day: int) -> str:
     return f"{((base_day + offset - 1) % max_day) + 1:02d}"
 
 
-WORKSTREAMS = [
+WORKSTREAMS: list[Workstream] = [
     {
         "name": "Authentication",
         "goal": "stabilize login reliability and role provisioning",
@@ -964,7 +986,10 @@ DOMAIN_SLANG_SNIPPETS = [
 
 LEGACY_ARTIFACT_SNIPPETS = [
     "Legacy note: term 'SEV-A bridge' from 2023 is deprecated but still appears in customer comms.",
-    "Historical artifact: old macro 'L2 queue v1' was sunset in 2024-09, yet copied in thread notes.",
+    (
+        "Historical artifact: old macro 'L2 queue v1' was sunset in 2024-09, "
+        "yet copied in thread notes."
+    ),
     "Legacy mapping 'impact_matrix_v0' is obsolete and kept only for audit traceability.",
 ]
 
@@ -1062,7 +1087,7 @@ BULK_DOCUMENT_COUNT = int(PROFILE_SETTINGS["bulk_documents"])
 BULK_FILE_COUNT = int(PROFILE_SETTINGS["bulk_files"])
 BULK_OPS_TOPIC_COUNT = int(PROFILE_SETTINGS["bulk_ops_topics"])
 
-WORKSTREAM_OWNERSHIP = {
+WORKSTREAM_OWNERSHIP: dict[str, OwnershipPools] = {
     "Authentication": {
         "author_pool": [3, 1, 13],
         "assignee_pool": [1, 13, 6],
@@ -1093,7 +1118,7 @@ WORKSTREAM_OWNERSHIP = {
 SECURITY_REVIEWERS = [6, 18]
 
 
-def _pick(pool: list[int], index: int, offset: int = 0) -> int:
+def _pick[T](pool: Sequence[T], index: int, offset: int = 0) -> T:
     return pool[(index + offset) % len(pool)]
 
 
@@ -1108,10 +1133,7 @@ def _subject_for_issue(
     short_signal = signal.split(" ", 3)[0:3]
     signal_fragment = " ".join(short_signal)
     if issue_class == "Epic":
-        return (
-            f"Epic #{issue_id}: {capability} program for {segment} accounts "
-            f"({account})"
-        )
+        return f"Epic #{issue_id}: {capability} program for {segment} accounts ({account})"
     if issue_class == "Feature":
         return f"Feature #{issue_id}: improve {capability} after {signal_fragment}"
     if issue_class == "Bug":
@@ -1123,7 +1145,7 @@ def _subject_for_issue(
 
 def _description_for_issue(
     issue_class: str,
-    stream: dict[str, object],
+    stream: Workstream,
     module_name: str,
     capability: str,
     signal: str,
@@ -1239,7 +1261,8 @@ def _journal_note(
         note = (
             f"Operational update: intake via {channel} from {account} ({segment}, {region}) "
             f"confirmed signal '{signal}'. Support queue tagged module {module_name} and scenario "
-            f"family '{scenario_family}'. Current owner ID {assigned_to_id} acknowledged action plan."
+            f"family '{scenario_family}'. Current owner ID {assigned_to_id} "
+            "acknowledged action plan."
         )
         if risk_flag == "Stalled":
             note += " Waiting for external evidence export before next execution step."
@@ -1261,8 +1284,10 @@ def _journal_note(
             "timeline evidence indicates ownership handoff is required",
         ][(index + journal_idx) % 3]
         return (
-            f"Decision log: selected remediation path '{remediation}'. Rationale: {decision_rationale}. "
-            f"Owner {assigned_to_id} commits prevention follow-up '{prevention}' and timeline traceability."
+            f"Decision log: selected remediation path '{remediation}'. "
+            f"Rationale: {decision_rationale}. "
+            f"Owner {assigned_to_id} commits prevention follow-up '{prevention}' "
+            "and timeline traceability."
         )
 
     postmortem_angle = [
@@ -1271,12 +1296,13 @@ def _journal_note(
         "knowledge update is necessary to avoid repeat incident",
     ][(index + journal_idx) % 3]
     return (
-        f"Postmortem summary: closure candidate reviewed for {account}. Outcome: {postmortem_angle}. "
+        f"Postmortem summary: closure candidate reviewed for {account}. "
+        f"Outcome: {postmortem_angle}. "
         f"Confirmed root cause '{root_cause}' and prevention action '{prevention}'."
     )
 
 
-def _bulk_issue(issue_id: int, index: int) -> dict:
+def _bulk_issue(issue_id: int, index: int) -> dict[str, Any]:
     project_id = 1
     story_index = index // len(ISSUE_CLASS_CYCLE)
     story_position = index % len(ISSUE_CLASS_CYCLE)
@@ -1371,7 +1397,9 @@ def _bulk_issue(issue_id: int, index: int) -> dict:
     decision_slot = 2 if journal_count > 2 else journal_count - 1
 
     detail_buckets: list[list[dict[str, str]]] = [[] for _ in range(journal_count)]
-    for transition_idx, (old_status, new_status) in enumerate(zip(status_path, status_path[1:])):
+    for transition_idx, (old_status, new_status) in enumerate(
+        zip(status_path, status_path[1:], strict=False)
+    ):
         detail_buckets[min(transition_idx, journal_count - 1)].append(
             {
                 "property": "attr",
@@ -1436,11 +1464,14 @@ def _bulk_issue(issue_id: int, index: int) -> dict:
             is_reopened_case=is_reopened_case,
         )
         if is_misprioritized_case and journal_idx == decision_slot:
-            note += " Priority remains below customer impact and requires explicit override evidence."
+            note += (
+                " Priority remains below customer impact and requires explicit override evidence."
+            )
         if has_noisy_language and journal_idx in {0, 1}:
             note += (
                 f" {NOISY_CZ_EN_SNIPPETS[(index + journal_idx) % len(NOISY_CZ_EN_SNIPPETS)]} "
-                f"Slang marker: {DOMAIN_SLANG_SNIPPETS[(index + journal_idx) % len(DOMAIN_SLANG_SNIPPETS)]}."
+                "Slang marker: "
+                f"{DOMAIN_SLANG_SNIPPETS[(index + journal_idx) % len(DOMAIN_SLANG_SNIPPETS)]}."
             )
         if has_legacy_artifact and journal_idx == decision_slot:
             note += f" {LEGACY_ARTIFACT_SNIPPETS[index % len(LEGACY_ARTIFACT_SNIPPETS)]}"
@@ -1475,8 +1506,7 @@ def _bulk_issue(issue_id: int, index: int) -> dict:
                 "content_type": "text/plain",
                 "description": f"{artifact_label.title()} evidence for issue {issue_id}",
                 "content_url": (
-                    "http://mock-redmine.local/attachments/"
-                    f"{attachment_id}/{attachment_filename}"
+                    f"http://mock-redmine.local/attachments/{attachment_id}/{attachment_filename}"
                 ),
                 "downloads": index % 20,
                 "author_id": author_id,
@@ -1646,9 +1676,7 @@ def _bulk_issue(issue_id: int, index: int) -> dict:
         "assigned_to_id": assigned_to_id,
         "start_date": f"2026-01-{created_day}",
         "due_date": (
-            f"2026-02-{_day_str(1, index + 2, 28)}"
-            if is_stalled_case
-            else f"2026-03-{due_day}"
+            f"2026-02-{_day_str(1, index + 2, 28)}" if is_stalled_case else f"2026-03-{due_day}"
         ),
         "done_ratio": done_ratio,
         "is_private": is_private,
@@ -1672,7 +1700,7 @@ def _add_bulk_issues(count: int = BULK_ISSUE_COUNT) -> None:
         ISSUES.append(_bulk_issue(issue_id, index))
 
 
-def _issue_custom_field(issue: dict, field_name: str, default: str = "") -> str:
+def _issue_custom_field(issue: dict[str, Any], field_name: str, default: str = "") -> str:
     for field in issue.get("custom_fields", []):
         if field.get("name") == field_name:
             value = field.get("value")
@@ -1757,7 +1785,9 @@ def _add_bulk_time_entries() -> None:
             f"(SLA target {target_response_hours:.2f}h) in {scenario_family} scenario."
         )
         if is_sla_breach:
-            first_response_comment += " SLA breach simulation: delayed acknowledgement triggered escalation policy."
+            first_response_comment += (
+                " SLA breach simulation: delayed acknowledgement triggered escalation policy."
+            )
         if is_night_incident:
             first_response_comment += " night shift incident response logged during on-call window."
 
@@ -1776,8 +1806,12 @@ def _add_bulk_time_entries() -> None:
                 "hours": first_response_entry_hours,
                 "comments": first_response_comment,
                 "spent_on": f"2026-02-{response_day}",
-                "created_on": f"2026-02-{response_day}T{response_hour:02d}:{response_minute:02d}:00Z",
-                "updated_on": f"2026-02-{response_day}T{response_hour:02d}:{response_minute:02d}:00Z",
+                "created_on": (
+                    f"2026-02-{response_day}T{response_hour:02d}:{response_minute:02d}:00Z"
+                ),
+                "updated_on": (
+                    f"2026-02-{response_day}T{response_hour:02d}:{response_minute:02d}:00Z"
+                ),
             }
         )
         entry_id += 1
@@ -1791,8 +1825,7 @@ def _add_bulk_time_entries() -> None:
             iterations += 2
 
         escalation_spike = (
-            issue_class == "Incident"
-            and ((issue["id"] - 1000) // len(ISSUE_CLASS_CYCLE)) % 5 == 0
+            issue_class == "Incident" and ((issue["id"] - 1000) // len(ISSUE_CLASS_CYCLE)) % 5 == 0
         )
         if escalation_spike:
             iterations += 2
@@ -1824,7 +1857,9 @@ def _add_bulk_time_entries() -> None:
             if risk_flag == "Stalled" and offset >= iterations - 2:
                 comment += " Work paused awaiting vendor evidence package."
             if escalation_spike and offset >= iterations - 2:
-                comment += " escalation spike war-room: parallel responders synchronized mitigation."
+                comment += (
+                    " escalation spike war-room: parallel responders synchronized mitigation."
+                )
             if status_id in {3, 5} and offset == iterations - 1:
                 comment += " Resolution validation completed and KPI counters updated."
 
@@ -1949,9 +1984,7 @@ def _add_bulk_news_documents_files() -> None:
         news_type = index % 3
         if news_type == 0:
             title = f"Release update {index + 1}: {module} stabilization"
-            summary = (
-                f"Release note for issues #{primary_issue['id']} and #{related_issue['id']}."
-            )
+            summary = f"Release note for issues #{primary_issue['id']} and #{related_issue['id']}."
             description = (
                 f"Release update documents production rollout and rollback checks for issue "
                 f"#{primary_issue['id']} with companion fix issue #{related_issue['id']}. "
@@ -1964,13 +1997,12 @@ def _add_bulk_news_documents_files() -> None:
             )
             description = (
                 f"Incident review summarizes detection, ownership handoff, and corrective actions "
-                f"for issue #{primary_issue['id']} (risk {risk_flag}). References wiki {wiki_title}."
+                f"for issue #{primary_issue['id']} (risk {risk_flag}). "
+                f"References wiki {wiki_title}."
             )
         else:
             title = f"Process change {index + 1}: support workflow calibration"
-            summary = (
-                f"Process change introduced from evidence in issue #{primary_issue['id']}."
-            )
+            summary = f"Process change introduced from evidence in issue #{primary_issue['id']}."
             description = (
                 f"Process change updates triage and citation workflow based on issues "
                 f"#{primary_issue['id']} and #{related_issue['id']} in module {module}. "
@@ -2044,9 +2076,7 @@ def _add_bulk_news_documents_files() -> None:
         module = _issue_custom_field(primary_issue, "Module", "Unknown Module")
         scenario_family = _issue_custom_field(primary_issue, "Scenario Family", "Operations")
         artifact_prefix, ext, content_type = file_artifacts[index % len(file_artifacts)]
-        filename = (
-            f"supporthub-{artifact_prefix}-issue-{primary_issue['id']}-{index + 1}.{ext}"
-        )
+        filename = f"supporthub-{artifact_prefix}-issue-{primary_issue['id']}-{index + 1}.{ext}"
         wiki_title = f"{wiki_topics[index % len(wiki_topics)]}-{(index % 20) + 1}"
         file_description = (
             f"Evidence artifact for issue #{primary_issue['id']} with related case "
@@ -2054,7 +2084,9 @@ def _add_bulk_news_documents_files() -> None:
             f"Referenced by wiki {wiki_title} and document #{92100 + (index % 18)}."
         )
         if index % 7 == 0:
-            file_description += " Historical note: artifact label follows deprecated naming scheme v1."
+            file_description += (
+                " Historical note: artifact label follows deprecated naming scheme v1."
+            )
         if index % 9 == 0:
             file_description += f" {NOISY_CZ_EN_SNIPPETS[index % len(NOISY_CZ_EN_SNIPPETS)]}"
         FILES.append(
@@ -2065,10 +2097,7 @@ def _add_bulk_news_documents_files() -> None:
                 "filesize": 1200 + (index * 37),
                 "content_type": content_type,
                 "description": file_description,
-                "content_url": (
-                    "http://mock-redmine.local/files/"
-                    f"{file_id}/{filename}"
-                ),
+                "content_url": (f"http://mock-redmine.local/files/{file_id}/{filename}"),
                 "author_id": primary_issue["assigned_to_id"],
                 "created_on": f"2026-02-{day}T14:00:00Z",
             }
@@ -2123,7 +2152,8 @@ def _add_bulk_boards_and_messages() -> None:
                 f"(issue #{primary_issue['id']})"
             )
             topic_content = (
-                f"Operational review for issue #{primary_issue['id']} ({issue_class}, risk {risk_flag}) "
+                f"Operational review for issue #{primary_issue['id']} "
+                f"({issue_class}, risk {risk_flag}) "
                 f"with related case #{related_issue['id']}. "
                 f"Decision point: confirm escalation owner and link action log to document "
                 f"#{92100 + (index % 18)}."

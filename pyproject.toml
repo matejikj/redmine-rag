@@ -19,15 +19,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ml = [
-  "sentence-transformers>=5.1.1",
-  "scikit-learn>=1.7.2",
-]
-local-llm = [
-  "ollama>=0.6.0",
-]
-
-[dependency-groups]
 dev = [
   "mypy>=1.18.2",
   "pre-commit>=4.3.0",
@@ -36,6 +27,13 @@ dev = [
   "pytest-cov>=7.0.0",
   "pytest-dotenv>=0.5.2",
   "ruff>=0.13.1",
+]
+ml = [
+  "sentence-transformers>=5.1.1",
+  "scikit-learn>=1.7.2",
+]
+local-llm = [
+  "ollama>=0.6.0",
 ]
 
 [project.scripts]

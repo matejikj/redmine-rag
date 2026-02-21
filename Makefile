@@ -1,5 +1,6 @@
 PYTHON ?= python3
-UV ?= uv
+VENV_PYTHON := .venv/bin/python
+RUNNER := $(if $(wildcard $(VENV_PYTHON)),$(VENV_PYTHON),$(PYTHON))
 
 .DEFAULT_GOAL := help
 
@@ -26,34 +27,34 @@ dev:
 	./scripts/dev.sh
 
 migrate:
-	$(UV) run alembic upgrade head
+	$(RUNNER) -m alembic upgrade head
 
 revision:
 	@test -n "$(msg)" || (echo "Usage: make revision msg=\"description\"" && exit 1)
-	$(UV) run alembic revision --autogenerate -m "$(msg)"
+	$(RUNNER) -m alembic revision --autogenerate -m "$(msg)"
 
 format:
-	$(UV) run ruff format .
+	$(RUNNER) -m ruff format .
 
 lint:
-	$(UV) run ruff check .
+	$(RUNNER) -m ruff check .
 
 typecheck:
-	$(UV) run mypy src
+	$(RUNNER) -m mypy src
 
 test:
-	$(UV) run pytest
+	$(RUNNER) -m pytest
 
 check: lint typecheck test
 
 sync:
-	$(UV) run redmine-rag sync run
+	$(RUNNER) -m redmine_rag.cli sync run
 
 eval:
-	$(PYTHON) scripts/eval/run_eval.py
+	$(RUNNER) scripts/eval/run_eval.py
 
 dataset-quality:
-	$(PYTHON) scripts/eval/check_mock_dataset_quality.py --all-profiles
+	$(RUNNER) scripts/eval/check_mock_dataset_quality.py --all-profiles
 
 mock-redmine:
 	./scripts/mock-redmine.sh

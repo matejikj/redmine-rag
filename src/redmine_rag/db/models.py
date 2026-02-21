@@ -2,7 +2,18 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from redmine_rag.db.base import Base, TimestampMixin
@@ -19,7 +30,9 @@ class RawEntity(Base, TimestampMixin):
     entity_id: Mapped[str] = mapped_column(String(128), index=True)
     endpoint: Mapped[str] = mapped_column(String(255))
     project_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-    updated_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    updated_on: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     payload: Mapped[dict] = mapped_column(JSON)
 
@@ -66,8 +79,12 @@ class Project(Base, TimestampMixin):
     is_public: Mapped[bool] = mapped_column(Boolean, default=True)
     parent_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     homepage: Mapped[str | None] = mapped_column(String(1024), nullable=True)
-    created_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
-    updated_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    created_on: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    updated_on: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
 
 
 class User(Base, TimestampMixin):
@@ -133,7 +150,9 @@ class IssuePriority(Base, TimestampMixin):
 
 class IssueCategory(Base, TimestampMixin):
     __tablename__ = "issue_category"
-    __table_args__ = (UniqueConstraint("project_id", "name", name="uq_issue_category_project_name"),)
+    __table_args__ = (
+        UniqueConstraint("project_id", "name", name="uq_issue_category_project_name"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), index=True)
@@ -191,7 +210,9 @@ class Issue(Base, TimestampMixin):
     closed_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     custom_fields: Mapped[dict] = mapped_column(JSON, default=dict)
 
-    journals: Mapped[list[Journal]] = relationship(back_populates="issue", cascade="all, delete-orphan")
+    journals: Mapped[list[Journal]] = relationship(
+        back_populates="issue", cascade="all, delete-orphan"
+    )
 
 
 class Journal(Base, TimestampMixin):
@@ -212,7 +233,9 @@ class Journal(Base, TimestampMixin):
 class IssueRelation(Base, TimestampMixin):
     __tablename__ = "issue_relation"
     __table_args__ = (
-        UniqueConstraint("issue_from_id", "issue_to_id", "relation_type", name="uq_issue_relation_pair"),
+        UniqueConstraint(
+            "issue_from_id", "issue_to_id", "relation_type", name="uq_issue_relation_pair"
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -256,7 +279,9 @@ class WikiVersion(Base, TimestampMixin):
     author_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     comments: Mapped[str | None] = mapped_column(Text, nullable=True)
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    updated_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    updated_on: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
 
 
 class TimeEntry(Base, TimestampMixin):
@@ -265,13 +290,17 @@ class TimeEntry(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), index=True)
     issue_id: Mapped[int | None] = mapped_column(ForeignKey("issue.id"), nullable=True, index=True)
-    user_id: Mapped[int | None] = mapped_column(ForeignKey("user_entity.id"), nullable=True, index=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_entity.id"), nullable=True, index=True
+    )
     activity_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     hours: Mapped[float | None] = mapped_column(Float, nullable=True)
     comments: Mapped[str | None] = mapped_column(Text, nullable=True)
     spent_on: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     created_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    updated_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    updated_on: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
 
 
 class Attachment(Base, TimestampMixin):
@@ -295,7 +324,9 @@ class Attachment(Base, TimestampMixin):
     content_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     downloads: Mapped[int] = mapped_column(Integer, default=0)
     author_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-    created_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    created_on: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     digest: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
@@ -308,7 +339,9 @@ class News(Base, TimestampMixin):
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     author_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-    created_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    created_on: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
 
 
 class Document(Base, TimestampMixin):
@@ -319,7 +352,9 @@ class Document(Base, TimestampMixin):
     category_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(512), index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    created_on: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
 
 
 class Board(Base, TimestampMixin):
@@ -347,8 +382,12 @@ class Message(Base, TimestampMixin):
     last_reply_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     locked: Mapped[bool] = mapped_column(Boolean, default=False)
     sticky: Mapped[int] = mapped_column(Integer, default=0)
-    created_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
-    updated_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    created_on: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    updated_on: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
 
 
 class CustomField(Base, TimestampMixin):
@@ -400,8 +439,12 @@ class DocChunk(Base, TimestampMixin):
     chunk_index: Mapped[int] = mapped_column(Integer, default=0)
     text: Mapped[str] = mapped_column(Text)
     url: Mapped[str] = mapped_column(String(1024))
-    source_created_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    source_updated_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    source_created_on: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    source_updated_on: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     source_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
     embedding_key: Mapped[str | None] = mapped_column(String(128), nullable=True, unique=True)
 
@@ -432,7 +475,9 @@ class SyncCursor(Base, TimestampMixin):
 
     entity_type: Mapped[str] = mapped_column(String(64), primary_key=True)
     project_scope: Mapped[str] = mapped_column(String(64), primary_key=True, default="global")
-    last_seen_updated_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen_updated_on: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cursor_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)

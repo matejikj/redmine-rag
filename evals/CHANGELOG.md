@@ -15,3 +15,12 @@ Initial stable release of the SupportHub mock dataset governance baseline.
 - Default runtime profile: `large`.
 - Profile selector: `MOCK_REDMINE_DATASET_PROFILE`.
 - Backward compatible API routes with existing mock Redmine contract.
+
+## v1.1.0 (2026-02-21)
+
+Evaluation and regression gate artifacts added.
+
+### Included capabilities
+- Baseline eval results fixture: `evals/results.baseline.v1.jsonl`.
+- Baseline metrics snapshot: `evals/baseline_metrics.v1.json`.
+- Eval report output and regression gate workflow for CI/non-regression checks.

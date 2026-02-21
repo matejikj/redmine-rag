@@ -27,3 +27,8 @@ jobs:
 
       - name: Run quality checks
         run: ./scripts/check.sh
+
+      - name: Run eval regression gate
+        run: |
+          python scripts/eval/run_eval.py --results evals/results.baseline.v1.jsonl --report-out evals/reports/latest_eval_report.json
+          python scripts/eval/check_regression_gate.py --current evals/reports/latest_eval_report.json --baseline evals/baseline_metrics.v1.json

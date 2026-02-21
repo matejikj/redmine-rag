@@ -2,181 +2,264 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections import Counter
+import re
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
+
+from redmine_rag.evaluation.evaluator import (
+    compute_metrics,
+    load_jsonl_rows,
+    summarize_dataset,
+    validate_dataset_rows,
+)
+
 DEFAULT_DATASET = Path("evals/supporthub_golden_v1.jsonl")
+CLAIM_LINE_PATTERN = re.compile(r"^\d+\.\s+")
+CITATION_MARKER_PATTERN = re.compile(r"\[(\d+(?:,\s*\d+)*)\]\s*$")
 
 
-def _load_jsonl(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
-        raise SystemExit(f"Missing file: {path}")
-    rows = [
-        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+def _build_ask_payload(row: dict[str, Any], top_k: int) -> dict[str, Any]:
+    filters = row.get("filters", {})
+    project_id = filters.get("project_id")
+    project_ids: list[int] = []
+    if isinstance(project_id, list):
+        project_ids = [int(value) for value in project_id]
+    elif project_id is not None and str(project_id).strip():
+        project_ids = [int(project_id)]
+
+    return {
+        "query": str(row["query"]),
+        "filters": {
+            "project_ids": project_ids,
+            "tracker_ids": [],
+            "status_ids": [],
+            "from_date": None,
+            "to_date": None,
+        },
+        "top_k": top_k,
+    }
+
+
+def _parse_result_row(query_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    answer_markdown = str(payload.get("answer_markdown", ""))
+    citations = list(payload.get("citations", []))
+
+    claim_lines = [
+        line.strip() for line in answer_markdown.splitlines() if CLAIM_LINE_PATTERN.match(line)
     ]
-    if not rows:
-        raise SystemExit(f"Empty JSONL file: {path}")
-    return rows
+    claims_total = len(claim_lines)
+    claims_with_citation = 0
+    claims_grounded = 0
+    cited_citation_ids: set[int] = set()
+    citation_index = {int(citation["id"]): citation for citation in citations if "id" in citation}
+
+    for line in claim_lines:
+        marker_match = CITATION_MARKER_PATTERN.search(line)
+        if marker_match is None:
+            continue
+        citation_ids = [int(value) for value in marker_match.group(1).replace(" ", "").split(",")]
+        valid_ids = [citation_id for citation_id in citation_ids if citation_id in citation_index]
+        if not valid_ids:
+            continue
+        claims_with_citation += 1
+        claims_grounded += 1
+        cited_citation_ids.update(valid_ids)
+
+    cited_sources = [
+        {
+            "source_type": citation_index[citation_id]["source_type"],
+            "source_id": citation_index[citation_id]["source_id"],
+        }
+        for citation_id in sorted(cited_citation_ids)
+    ]
+    retrieved_sources = [
+        {"source_type": citation["source_type"], "source_id": citation["source_id"]}
+        for citation in citations
+    ]
+
+    return {
+        "id": query_id,
+        "claims_total": claims_total,
+        "claims_with_citation": claims_with_citation,
+        "claims_grounded": claims_grounded,
+        "retrieved_sources": retrieved_sources,
+        "cited_sources": cited_sources,
+    }
 
 
-def _normalize_source_key(source: dict[str, Any]) -> str:
-    source_type = str(source.get("source_type", "")).strip()
-    source_id = source.get("source_id")
-    if source_type in {"journal", "attachment"} and "#" in str(source_id):
-        return f"{source_type}:{source_id}"
-    if source_id is None:
-        return f"{source_type}:unknown"
-    return f"{source_type}:{source_id}"
+def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = "\n".join(json.dumps(row, ensure_ascii=False) for row in rows)
+    path.write_text(payload + ("\n" if payload else ""), encoding="utf-8")
 
 
-def _validate_dataset(rows: list[dict[str, Any]]) -> None:
-    if not (40 <= len(rows) <= 80):
-        raise SystemExit(f"Expected 40-80 golden queries, got {len(rows)}")
-
-    ids = [str(row.get("id", "")) for row in rows]
-    if len(set(ids)) != len(ids):
-        raise SystemExit("Golden dataset has duplicate query ids")
-
-    for row in rows:
-        for field_name in ("id", "query", "expected_answer_type", "expected_sources"):
-            if field_name not in row:
-                raise SystemExit(f"Dataset row missing field '{field_name}': {row}")
-        if not isinstance(row["expected_sources"], list) or not row["expected_sources"]:
-            raise SystemExit(f"Query {row['id']} has empty expected_sources")
-        for source in row["expected_sources"]:
-            if "source_type" not in source:
-                raise SystemExit(
-                    f"Query {row['id']} has malformed source without source_type: {source}"
-                )
-
-
-def _print_dataset_summary(rows: list[dict[str, Any]]) -> None:
-    answer_types = Counter(str(row["expected_answer_type"]) for row in rows)
-    difficulties = Counter(str(row.get("difficulty", "unknown")) for row in rows)
-    languages = Counter(str(row.get("language", "unknown")) for row in rows)
-    source_type_coverage = Counter(
-        str(source["source_type"]) for row in rows for source in row["expected_sources"]
-    )
-    print(f"Loaded {len(rows)} golden queries")
-    print(f"Answer type coverage: {dict(answer_types)}")
-    print(f"Difficulty split: {dict(difficulties)}")
-    print(f"Language split: {dict(languages)}")
-    print(f"Expected source-type coverage: {dict(source_type_coverage)}")
-
-
-def _evaluate_results(
+def _run_live_eval(
+    *,
     dataset_rows: list[dict[str, Any]],
-    results_rows: list[dict[str, Any]],
+    api_base_url: str,
     top_k: int,
+    timeout_s: float,
+    output_results: Path,
+) -> list[dict[str, Any]]:
+    url = f"{api_base_url.rstrip('/')}/v1/ask"
+    results: list[dict[str, Any]] = []
+    with httpx.Client(timeout=timeout_s) as client:
+        for row in dataset_rows:
+            query_id = str(row["id"])
+            payload = _build_ask_payload(row, top_k=top_k)
+            response = client.post(url, json=payload)
+            if response.status_code != 200:
+                raise SystemExit(
+                    "Ask API failed for "
+                    f"{query_id}: status={response.status_code}, body={response.text}"
+                )
+            result_row = _parse_result_row(query_id=query_id, payload=response.json())
+            results.append(result_row)
+
+    _write_jsonl(output_results, results)
+    return results
+
+
+def _load_report_metrics(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    metrics = payload.get("metrics")
+    if not isinstance(metrics, dict):
+        raise SystemExit(f"Invalid report file: metrics missing in {path}")
+    return metrics
+
+
+def _evaluate_thresholds(
+    *,
+    metrics: dict[str, Any],
     min_citation_coverage: float | None,
     min_groundedness: float | None,
     min_retrieval_hit_rate: float | None,
-) -> None:
-    dataset_by_id = {str(row["id"]): row for row in dataset_rows}
-    results_by_id = {str(row.get("id", "")): row for row in results_rows}
-
-    missing_ids = sorted(set(dataset_by_id) - set(results_by_id))
-    if missing_ids:
-        raise SystemExit(f"Results missing {len(missing_ids)} query ids, e.g. {missing_ids[:5]}")
-
-    citation_scores: list[float] = []
-    groundedness_scores: list[float] = []
-    retrieval_hits = 0
-    source_type_counter: Counter[str] = Counter()
-
-    for query_id, expected in dataset_by_id.items():
-        result = results_by_id[query_id]
-        claims_total = int(result.get("claims_total", 0))
-        claims_with_citation = int(result.get("claims_with_citation", 0))
-        claims_grounded = int(result.get("claims_grounded", 0))
-        cited_sources = list(result.get("cited_sources", []))
-        retrieved_sources = list(result.get("retrieved_sources", []))
-
-        if claims_total > 0:
-            citation_coverage = claims_with_citation / claims_total
-            groundedness = claims_grounded / claims_total
-        else:
-            citation_coverage = 1.0 if cited_sources else 0.0
-            groundedness = 1.0 if cited_sources else 0.0
-
-        citation_scores.append(citation_coverage)
-        groundedness_scores.append(groundedness)
-        source_type_counter.update(
-            str(source.get("source_type", "unknown")) for source in cited_sources
-        )
-
-        expected_keys = {_normalize_source_key(source) for source in expected["expected_sources"]}
-        retrieved_keys = [_normalize_source_key(source) for source in retrieved_sources[:top_k]]
-        if expected_keys.intersection(retrieved_keys):
-            retrieval_hits += 1
-
-    citation_avg = sum(citation_scores) / len(citation_scores)
-    groundedness_avg = sum(groundedness_scores) / len(groundedness_scores)
-    retrieval_hit_rate = retrieval_hits / len(dataset_by_id)
-
-    print("Computed metrics from results:")
-    print(f"  citation_coverage: {citation_avg:.3f}")
-    print(f"  groundedness: {groundedness_avg:.3f}")
-    print(f"  retrieval_hit_rate@{top_k}: {retrieval_hit_rate:.3f}")
-    print(f"  cited_source_type_coverage: {dict(source_type_counter)}")
-
+) -> list[str]:
     failures: list[str] = []
-    if min_citation_coverage is not None and citation_avg < min_citation_coverage:
+    citation_coverage = float(metrics.get("citation_coverage", 0.0))
+    groundedness = float(metrics.get("groundedness", 0.0))
+    retrieval_hit_rate = float(metrics.get("retrieval_hit_rate", 0.0))
+    if min_citation_coverage is not None and citation_coverage < min_citation_coverage:
         failures.append(
-            f"citation_coverage {citation_avg:.3f} < threshold {min_citation_coverage:.3f}"
+            f"citation_coverage {citation_coverage:.3f} < threshold {min_citation_coverage:.3f}"
         )
-    if min_groundedness is not None and groundedness_avg < min_groundedness:
-        failures.append(f"groundedness {groundedness_avg:.3f} < threshold {min_groundedness:.3f}")
+    if min_groundedness is not None and groundedness < min_groundedness:
+        failures.append(f"groundedness {groundedness:.3f} < threshold {min_groundedness:.3f}")
     if min_retrieval_hit_rate is not None and retrieval_hit_rate < min_retrieval_hit_rate:
         failures.append(
             f"retrieval_hit_rate {retrieval_hit_rate:.3f} < threshold {min_retrieval_hit_rate:.3f}"
         )
-    if failures:
-        raise SystemExit("Evaluation thresholds failed: " + "; ".join(failures))
+    return failures
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run golden evaluation dataset checks")
     parser.add_argument(
-        "--dataset",
-        default=str(DEFAULT_DATASET),
-        help="Path to golden dataset JSONL",
+        "--dataset", default=str(DEFAULT_DATASET), help="Path to golden dataset JSONL"
     )
     parser.add_argument(
         "--results",
         default=None,
         help=(
-            "Optional results JSONL from /v1/ask evaluation run. "
-            "Rows should include id, claims_total, claims_with_citation, claims_grounded, "
-            "retrieved_sources[], cited_sources[]."
+            "Optional results JSONL. If omitted and --api-base-url is set, "
+            "results will be generated via live /v1/ask calls."
         ),
     )
+    parser.add_argument(
+        "--api-base-url",
+        default=None,
+        help="Optional API base URL for live eval runner, e.g. http://127.0.0.1:8000",
+    )
+    parser.add_argument(
+        "--output-results",
+        default="evals/results.latest.jsonl",
+        help="Where to write generated results for live eval runs",
+    )
+    parser.add_argument(
+        "--report-out",
+        default="evals/reports/latest_eval_report.json",
+        help="Where to write evaluation report JSON",
+    )
     parser.add_argument("--top-k", type=int, default=20, help="Top-K retrieval window")
+    parser.add_argument("--timeout-s", type=float, default=20.0, help="Live API timeout in seconds")
     parser.add_argument("--min-citation-coverage", type=float, default=None)
     parser.add_argument("--min-groundedness", type=float, default=None)
     parser.add_argument("--min-retrieval-hit-rate", type=float, default=None)
     args = parser.parse_args()
 
-    dataset_rows = _load_jsonl(Path(args.dataset))
-    _validate_dataset(dataset_rows)
-    _print_dataset_summary(dataset_rows)
+    dataset_path = Path(args.dataset)
+    dataset_rows = load_jsonl_rows(dataset_path)
+    try:
+        validate_dataset_rows(dataset_rows)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
 
+    dataset_summary = summarize_dataset(dataset_rows)
+    print(f"Loaded {len(dataset_rows)} golden queries from {dataset_path}")
+    print(f"Answer type coverage: {dataset_summary['answer_type_coverage']}")
+    print(f"Difficulty split: {dataset_summary['difficulty_split']}")
+    print(f"Language split: {dataset_summary['language_split']}")
+    print(f"Expected source-type coverage: {dataset_summary['expected_source_type_coverage']}")
+
+    results_rows: list[dict[str, Any]] | None = None
     if args.results:
-        results_rows = _load_jsonl(Path(args.results))
-        _evaluate_results(
+        results_rows = load_jsonl_rows(Path(args.results))
+        print(f"Loaded {len(results_rows)} evaluation rows from {args.results}")
+    elif args.api_base_url:
+        output_results = Path(args.output_results)
+        results_rows = _run_live_eval(
             dataset_rows=dataset_rows,
-            results_rows=results_rows,
+            api_base_url=args.api_base_url,
             top_k=args.top_k,
-            min_citation_coverage=args.min_citation_coverage,
-            min_groundedness=args.min_groundedness,
-            min_retrieval_hit_rate=args.min_retrieval_hit_rate,
+            timeout_s=args.timeout_s,
+            output_results=output_results,
         )
-    else:
+        print(f"Generated {len(results_rows)} evaluation rows to {output_results}")
+
+    if results_rows is None:
         print(
-            "No results file provided. Dataset schema and coverage are valid. "
-            "Pass --results to compute citation coverage, groundedness, and retrieval hit rate."
+            "No results to evaluate. Provide --results or --api-base-url. "
+            "Dataset schema and coverage are valid."
         )
+        return
+
+    metrics, query_diagnostics, failures = compute_metrics(
+        dataset_rows=dataset_rows, results_rows=results_rows, top_k=args.top_k
+    )
+    if failures:
+        raise SystemExit("Evaluation failed: " + "; ".join(failures))
+
+    print("Computed metrics:")
+    print(f"  citation_coverage: {metrics.citation_coverage:.3f}")
+    print(f"  groundedness: {metrics.groundedness:.3f}")
+    print(f"  retrieval_hit_rate@{args.top_k}: {metrics.retrieval_hit_rate:.3f}")
+    print(f"  cited_source_type_coverage: {metrics.source_type_coverage}")
+
+    threshold_failures = _evaluate_thresholds(
+        metrics=metrics.to_dict(),
+        min_citation_coverage=args.min_citation_coverage,
+        min_groundedness=args.min_groundedness,
+        min_retrieval_hit_rate=args.min_retrieval_hit_rate,
+    )
+    if threshold_failures:
+        raise SystemExit("Evaluation thresholds failed: " + "; ".join(threshold_failures))
+
+    report = {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "dataset_path": str(dataset_path),
+        "results_path": args.results or str(Path(args.output_results)),
+        "top_k": args.top_k,
+        "metrics": metrics.to_dict(),
+        "dataset_summary": dataset_summary,
+        "query_diagnostics": [item.to_dict() for item in query_diagnostics],
+    }
+    report_path = Path(args.report_out)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Wrote evaluation report to {report_path}")
 
 
 if __name__ == "__main__":

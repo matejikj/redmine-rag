@@ -50,6 +50,8 @@ make sync
 make reindex
 make embed
 make eval
+make eval-baseline
+make eval-gate
 make dataset-quality
 make mock-redmine
 ```

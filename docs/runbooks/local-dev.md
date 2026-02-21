@@ -96,6 +96,18 @@ Notes on extraction limits:
 curl "http://127.0.0.1:8000/v1/metrics/summary?project_ids=1&from_date=2026-02-01T00:00:00Z&to_date=2026-02-21T23:59:59Z"
 ```
 
+## Run eval regression gate
+
+```bash
+make eval-gate
+```
+
+For live eval run against local API:
+
+```bash
+python3 scripts/eval/run_eval.py --api-base-url http://127.0.0.1:8000 --output-results evals/results.latest.jsonl
+```
+
 ## Develop without real Redmine access
 
 ```bash

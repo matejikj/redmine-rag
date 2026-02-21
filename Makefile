@@ -19,6 +19,8 @@ help:
 	@echo "  make reindex     - rebuild doc chunks and FTS index"
 	@echo "  make embed       - refresh vector embeddings"
 	@echo "  make eval        - run local eval scaffold"
+	@echo "  make eval-baseline - rebuild baseline eval artifacts"
+	@echo "  make eval-gate   - run regression gate against baseline"
 	@echo "  make dataset-quality - validate dataset quality constraints"
 	@echo "  make mock-redmine - run local Mock Redmine API"
 
@@ -60,6 +62,13 @@ embed:
 
 eval:
 	$(RUNNER) scripts/eval/run_eval.py
+
+eval-baseline:
+	$(RUNNER) scripts/eval/build_baseline_results.py
+
+eval-gate:
+	$(RUNNER) scripts/eval/run_eval.py --results evals/results.baseline.v1.jsonl --report-out evals/reports/latest_eval_report.json
+	$(RUNNER) scripts/eval/check_regression_gate.py --current evals/reports/latest_eval_report.json --baseline evals/baseline_metrics.v1.json
 
 dataset-quality:
 	$(RUNNER) scripts/eval/check_mock_dataset_quality.py --all-profiles

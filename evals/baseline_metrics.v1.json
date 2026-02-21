@@ -1,0 +1,21 @@
+{
+  "version": "v1",
+  "dataset_path": "evals/supporthub_golden_v1.jsonl",
+  "results_path": "evals/results.baseline.v1.jsonl",
+  "metrics": {
+    "query_count": 50,
+    "citation_coverage": 1.0,
+    "groundedness": 1.0,
+    "retrieval_hit_rate": 1.0,
+    "source_type_coverage": {
+      "issue": 44,
+      "journal": 4,
+      "wiki": 39,
+      "message": 7,
+      "news": 22,
+      "document": 22,
+      "attachment": 6,
+      "file": 6
+    }
+  }
+}

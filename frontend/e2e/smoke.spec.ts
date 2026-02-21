@@ -244,3 +244,121 @@ test("metrics dashboard extraction and evaluation flow", async ({ page }) => {
   await expect(page.getByText("processed 4 issues")).toBeVisible();
   await expect(page.getByText("success: 3")).toBeVisible();
 });
+
+test("ops dashboard run controls and release checklist journey", async ({ page }) => {
+  const runs = [
+    {
+      id: "run-1",
+      action: "backup",
+      status: "success",
+      started_at: "2026-02-21T12:00:00Z",
+      finished_at: "2026-02-21T12:00:02Z",
+      detail: "Backup completed at backups/snapshot-20260221T120000Z",
+      summary: { backup_dir: "backups/snapshot-20260221T120000Z" }
+    }
+  ];
+
+  await page.route("**/healthz", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "degraded",
+        app: "redmine-rag",
+        version: "0.1.0",
+        utc_time: "2026-02-21T12:30:00Z",
+        checks: [
+          { name: "database", status: "ok", detail: "Database connection healthy", latency_ms: 5 },
+          {
+            name: "llm_telemetry",
+            status: "warn",
+            detail: JSON.stringify({
+              success_rate: 0.93,
+              p95_latency_ms: 12900,
+              circuit: { state: "closed" }
+            }),
+            latency_ms: 12900
+          }
+        ],
+        sync_jobs: { queued: 0, running: 0, finished: 5, failed: 1 }
+      })
+    });
+  });
+
+  await page.route("**/v1/ops/environment", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        generated_at: "2026-02-21T12:30:00Z",
+        app: "redmine-rag",
+        version: "0.1.0",
+        app_env: "dev",
+        redmine_base_url: "http://127.0.0.1:8081",
+        redmine_allowed_hosts: ["127.0.0.1", "localhost"],
+        llm_provider: "ollama",
+        llm_model: "Mistral-7B-Instruct-v0.3-Q4_K_M",
+        llm_extract_enabled: true
+      })
+    });
+  });
+
+  await page.route("**/v1/ops/runs?**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        items: runs,
+        total: runs.length
+      })
+    });
+  });
+
+  await page.route("**/v1/ops/backup", async (route) => {
+    runs.unshift({
+      id: "run-2",
+      action: "backup",
+      status: "success",
+      started_at: "2026-02-21T12:31:00Z",
+      finished_at: "2026-02-21T12:31:03Z",
+      detail: "Backup completed at backups/snapshot-20260221T123100Z",
+      summary: { backup_dir: "backups/snapshot-20260221T123100Z" }
+    });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ accepted: true, run: runs[0] })
+    });
+  });
+
+  await page.route("**/v1/ops/maintenance", async (route) => {
+    runs.unshift({
+      id: "run-3",
+      action: "maintenance",
+      status: "success",
+      started_at: "2026-02-21T12:31:10Z",
+      finished_at: "2026-02-21T12:31:13Z",
+      detail: "Maintenance completed in 120 ms",
+      summary: { elapsed_ms: 120 }
+    });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ accepted: true, run: runs[0] })
+    });
+  });
+
+  await page.goto("/ops");
+  await expect(page.getByRole("heading", { name: "Ops, Release, and Hardening" })).toBeVisible();
+  await expect(page.getByText("Mistral-7B-Instruct-v0.3-Q4_K_M")).toBeVisible();
+  await expect(page.getByText("success=93.0%, p95=12900 ms, circuit=closed")).toBeVisible();
+
+  await page.getByRole("button", { name: "Run backup" }).click();
+  await expect(page.getByText("Backup run success:")).toBeVisible();
+
+  await page.getByRole("button", { name: "Run maintenance" }).click();
+  await expect(page.getByText("Maintenance run success:")).toBeVisible();
+
+  await page.getByRole("checkbox").first().check();
+  await expect(page.getByText("Completed 1/6")).toBeVisible();
+});

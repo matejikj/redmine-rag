@@ -59,6 +59,12 @@ Task 19 metrics dashboard is available under `Metrics` page in the UI:
 - LLM extraction counters (success/failed/skipped/retries) from latest run
 - eval/regression widget backed by latest artifacts via `GET /v1/evals/latest`
 
+Task 20 ops hardening workspace is available under `Ops` page in the UI:
+- runtime environment/status view (app env, provider/model, health diagnostics)
+- backup and maintenance action triggers (`POST /v1/ops/backup`, `POST /v1/ops/maintenance`)
+- operations run history (`GET /v1/ops/runs`)
+- release-readiness checklist for UI/API cutover rehearsal
+
 ## Docker (optional)
 
 ```bash
@@ -95,6 +101,7 @@ make ui-test
 - `tests/` test suite
 - `docs/` architecture and runbooks
 - `docs/runbooks/operations.md` production operations, backup/recovery, and incident response
+- `docs/runbooks/release-cutover-ui.md` UI/API go-live cutover checklist
 - `docs/data-model.md` normalized and raw data model reference
 - `prompts/` reusable prompt assets
 - `evals/` evaluation datasets
@@ -112,6 +119,10 @@ make ui-test
 - `POST /v1/extract/properties`
 - `GET /v1/metrics/summary`
 - `GET /v1/evals/latest`
+- `GET /v1/ops/environment`
+- `GET /v1/ops/runs`
+- `POST /v1/ops/backup`
+- `POST /v1/ops/maintenance`
 
 `POST /v1/ask` behavior:
 - returns only grounded claims derived from retrieved chunks

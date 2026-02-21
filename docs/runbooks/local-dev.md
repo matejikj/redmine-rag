@@ -31,6 +31,13 @@ Sync control center workflow (Task 17):
 - trigger sync and monitor live table updates
 - select a failed job and use `Retry selected job`
 
+Ops hardening workflow (Task 20):
+- open `Ops` page
+- validate environment cards (`app env`, `LLM provider/model`, health snapshot)
+- run `Run backup` and check `Operations Run History`
+- run `Run maintenance` and verify completion feedback
+- complete `Release Readiness Checklist` before cutover rehearsal
+
 Backend-served SPA mode:
 
 ```bash

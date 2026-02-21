@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { apiClient } from "./client";
-import type { AskRequest, ExtractRequest, SyncRequest } from "./types";
+import type { AskRequest, ExtractRequest, OpsBackupRequest, SyncRequest } from "./types";
 
 export function useHealthQuery() {
   return useQuery({
@@ -43,6 +43,24 @@ export function useEvalArtifactsQuery() {
   });
 }
 
+export function useOpsEnvironmentQuery() {
+  return useQuery({
+    queryKey: ["ops-environment"],
+    queryFn: () => apiClient.getOpsEnvironment(),
+    staleTime: 60_000,
+    refetchInterval: 120_000
+  });
+}
+
+export function useOpsRunsQuery() {
+  return useQuery({
+    queryKey: ["ops-runs"],
+    queryFn: () => apiClient.listOpsRuns({ limit: 20 }),
+    staleTime: 3_000,
+    refetchInterval: 5_000
+  });
+}
+
 export function useSyncJobQuery(jobId: string | null) {
   return useQuery({
     queryKey: ["sync-job", jobId],
@@ -68,5 +86,17 @@ export function useAskMutation() {
 export function useExtractMutation() {
   return useMutation({
     mutationFn: (payload: ExtractRequest) => apiClient.runExtraction(payload)
+  });
+}
+
+export function useOpsBackupMutation() {
+  return useMutation({
+    mutationFn: (payload: OpsBackupRequest) => apiClient.runOpsBackup(payload)
+  });
+}
+
+export function useOpsMaintenanceMutation() {
+  return useMutation({
+    mutationFn: () => apiClient.runOpsMaintenance()
   });
 }

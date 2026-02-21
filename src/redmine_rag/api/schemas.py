@@ -195,3 +195,39 @@ class EvalArtifactsResponse(BaseModel):
     failures: list[str] = Field(default_factory=list)
     llm_runtime_failures: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+
+
+class OpsEnvironmentResponse(BaseModel):
+    generated_at: datetime
+    app: str
+    version: str
+    app_env: str
+    redmine_base_url: str
+    redmine_allowed_hosts: list[str]
+    llm_provider: str
+    llm_model: str
+    llm_extract_enabled: bool
+
+
+class OpsBackupRequest(BaseModel):
+    output_dir: str | None = Field(default=None, max_length=500)
+
+
+class OpsRunRecord(BaseModel):
+    id: str
+    action: Literal["backup", "maintenance"]
+    status: Literal["success", "failed"]
+    started_at: datetime
+    finished_at: datetime
+    detail: str
+    summary: dict[str, object] = Field(default_factory=dict)
+
+
+class OpsActionResponse(BaseModel):
+    accepted: bool
+    run: OpsRunRecord
+
+
+class OpsRunListResponse(BaseModel):
+    items: list[OpsRunRecord]
+    total: int

@@ -85,3 +85,11 @@ Use this operator flow for terminal-free quality checks:
    - metric deltas against baseline
    - failure notes and artifact hints
 6. Export snapshots for handover or incident notes.
+
+## Ops Dashboard Usage (Task 20)
+
+1. Open `Ops` page and review environment/runtime cards.
+2. Use `Operations Controls` to run backup and maintenance actions.
+3. Validate execution outcome in `Operations Run History`.
+4. Filter `Health Checks` by `warn`/`fail` during incidents.
+5. Complete `Release Readiness Checklist` before deployment cutover.

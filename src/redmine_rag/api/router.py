@@ -12,6 +12,10 @@ from redmine_rag.api.schemas import (
     ExtractResponse,
     HealthResponse,
     MetricsSummaryResponse,
+    OpsActionResponse,
+    OpsBackupRequest,
+    OpsEnvironmentResponse,
+    OpsRunListResponse,
     SyncJobListResponse,
     SyncJobResponse,
     SyncRequest,
@@ -21,7 +25,13 @@ from redmine_rag.extraction.properties import extract_issue_properties
 from redmine_rag.services.ask_service import answer_question
 from redmine_rag.services.eval_artifacts_service import get_eval_artifacts_summary
 from redmine_rag.services.metrics_service import get_metrics_summary
-from redmine_rag.services.ops_service import get_health_status
+from redmine_rag.services.ops_service import (
+    get_health_status,
+    get_ops_environment,
+    list_ops_runs,
+    run_backup_operation,
+    run_maintenance_operation,
+)
 from redmine_rag.services.sync_service import get_sync_job, list_sync_jobs, queue_sync_job
 
 router = APIRouter()
@@ -79,3 +89,23 @@ async def metrics_summary(
 @router.get("/v1/evals/latest", response_model=EvalArtifactsResponse)
 async def evals_latest() -> EvalArtifactsResponse:
     return await get_eval_artifacts_summary()
+
+
+@router.get("/v1/ops/environment", response_model=OpsEnvironmentResponse)
+async def ops_environment() -> OpsEnvironmentResponse:
+    return await get_ops_environment()
+
+
+@router.get("/v1/ops/runs", response_model=OpsRunListResponse)
+async def ops_runs(limit: int = Query(default=20, ge=1, le=100)) -> OpsRunListResponse:
+    return await list_ops_runs(limit=limit)
+
+
+@router.post("/v1/ops/backup", response_model=OpsActionResponse)
+async def ops_backup(payload: OpsBackupRequest | None = None) -> OpsActionResponse:
+    return await run_backup_operation(output_dir=payload.output_dir if payload else None)
+
+
+@router.post("/v1/ops/maintenance", response_model=OpsActionResponse)
+async def ops_maintenance() -> OpsActionResponse:
+    return await run_maintenance_operation()

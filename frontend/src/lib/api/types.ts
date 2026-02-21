@@ -23,6 +23,42 @@ export interface HealthResponse {
   sync_jobs: SyncJobCounts;
 }
 
+export interface OpsEnvironmentResponse {
+  generated_at: string;
+  app: string;
+  version: string;
+  app_env: string;
+  redmine_base_url: string;
+  redmine_allowed_hosts: string[];
+  llm_provider: string;
+  llm_model: string;
+  llm_extract_enabled: boolean;
+}
+
+export interface OpsBackupRequest {
+  output_dir: string | null;
+}
+
+export interface OpsRunRecord {
+  id: string;
+  action: "backup" | "maintenance";
+  status: "success" | "failed";
+  started_at: string;
+  finished_at: string;
+  detail: string;
+  summary: Record<string, unknown>;
+}
+
+export interface OpsActionResponse {
+  accepted: boolean;
+  run: OpsRunRecord;
+}
+
+export interface OpsRunListResponse {
+  items: OpsRunRecord[];
+  total: number;
+}
+
 export interface AskFilters {
   project_ids: number[];
   tracker_ids: number[];

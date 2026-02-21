@@ -1,24 +1,69 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import shutil
 import sqlite3
 import time
+from collections import deque
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Lock
 from typing import Any, Literal
 from urllib.parse import urlparse
+from uuid import uuid4
 
 from sqlalchemy import func, select, text
 
 from redmine_rag import __version__
-from redmine_rag.api.schemas import HealthCheck, HealthResponse, SyncJobCounts
+from redmine_rag.api.schemas import (
+    HealthCheck,
+    HealthResponse,
+    OpsActionResponse,
+    OpsEnvironmentResponse,
+    OpsRunListResponse,
+    OpsRunRecord,
+    SyncJobCounts,
+)
 from redmine_rag.core.config import get_settings
 from redmine_rag.db.models import SyncJob, SyncState
 from redmine_rag.db.session import get_session_factory
 from redmine_rag.services.guardrail_service import guardrail_rejection_counters
 from redmine_rag.services.llm_runtime import is_ollama_provider, probe_llm_runtime
 from redmine_rag.services.llm_telemetry_service import get_llm_telemetry_snapshot
+
+_OPS_RUNS: deque[OpsRunRecord] = deque(maxlen=100)
+_OPS_RUNS_LOCK = Lock()
+logger = logging.getLogger(__name__)
+
+
+def _record_ops_run(
+    *,
+    action: Literal["backup", "maintenance"],
+    status: Literal["success", "failed"],
+    started_at: datetime,
+    finished_at: datetime,
+    detail: str,
+    summary: dict[str, object],
+) -> OpsRunRecord:
+    record = OpsRunRecord(
+        id=uuid4().hex,
+        action=action,
+        status=status,
+        started_at=started_at,
+        finished_at=finished_at,
+        detail=detail,
+        summary=summary,
+    )
+    with _OPS_RUNS_LOCK:
+        _OPS_RUNS.appendleft(record)
+    return record
+
+
+def reset_ops_run_history() -> None:
+    with _OPS_RUNS_LOCK:
+        _OPS_RUNS.clear()
 
 
 async def get_health_status() -> HealthResponse:
@@ -233,6 +278,116 @@ async def get_health_status() -> HealthResponse:
         checks=checks,
         sync_jobs=sync_counts,
     )
+
+
+async def get_ops_environment() -> OpsEnvironmentResponse:
+    settings = get_settings()
+    return OpsEnvironmentResponse(
+        generated_at=datetime.now(UTC),
+        app=settings.app_name,
+        version=__version__,
+        app_env=settings.app_env,
+        redmine_base_url=settings.redmine_base_url,
+        redmine_allowed_hosts=list(settings.redmine_allowed_hosts),
+        llm_provider=settings.llm_provider,
+        llm_model=settings.ollama_model,
+        llm_extract_enabled=settings.llm_extract_enabled,
+    )
+
+
+def _normalize_backup_destination(output_dir: str | None) -> Path | None:
+    if output_dir is None:
+        return None
+    stripped = output_dir.strip()
+    if not stripped:
+        return None
+    return Path(stripped).expanduser()
+
+
+async def run_backup_operation(*, output_dir: str | None) -> OpsActionResponse:
+    started_at = datetime.now(UTC)
+    try:
+        destination = _normalize_backup_destination(output_dir)
+        summary = await asyncio.to_thread(create_state_backup, destination)
+        finished_at = datetime.now(UTC)
+        run = _record_ops_run(
+            action="backup",
+            status="success",
+            started_at=started_at,
+            finished_at=finished_at,
+            detail=f"Backup completed at {summary.get('backup_dir')}",
+            summary=summary,
+        )
+        logger.info(
+            "Ops backup completed",
+            extra={
+                "ops_action": "backup",
+                "ops_status": "success",
+                "backup_dir": summary.get("backup_dir"),
+            },
+        )
+        return OpsActionResponse(accepted=True, run=run)
+    except Exception as exc:  # noqa: BLE001
+        finished_at = datetime.now(UTC)
+        run = _record_ops_run(
+            action="backup",
+            status="failed",
+            started_at=started_at,
+            finished_at=finished_at,
+            detail=f"Backup failed: {exc}",
+            summary={},
+        )
+        logger.exception(
+            "Ops backup failed",
+            extra={"ops_action": "backup", "ops_status": "failed"},
+        )
+        return OpsActionResponse(accepted=False, run=run)
+
+
+async def run_maintenance_operation() -> OpsActionResponse:
+    started_at = datetime.now(UTC)
+    try:
+        summary = await asyncio.to_thread(run_sqlite_maintenance)
+        finished_at = datetime.now(UTC)
+        run = _record_ops_run(
+            action="maintenance",
+            status="success",
+            started_at=started_at,
+            finished_at=finished_at,
+            detail=f"Maintenance completed in {summary.get('elapsed_ms')} ms",
+            summary=summary,
+        )
+        logger.info(
+            "Ops maintenance completed",
+            extra={
+                "ops_action": "maintenance",
+                "ops_status": "success",
+                "elapsed_ms": summary.get("elapsed_ms"),
+            },
+        )
+        return OpsActionResponse(accepted=True, run=run)
+    except Exception as exc:  # noqa: BLE001
+        finished_at = datetime.now(UTC)
+        run = _record_ops_run(
+            action="maintenance",
+            status="failed",
+            started_at=started_at,
+            finished_at=finished_at,
+            detail=f"Maintenance failed: {exc}",
+            summary={},
+        )
+        logger.exception(
+            "Ops maintenance failed",
+            extra={"ops_action": "maintenance", "ops_status": "failed"},
+        )
+        return OpsActionResponse(accepted=False, run=run)
+
+
+async def list_ops_runs(*, limit: int) -> OpsRunListResponse:
+    with _OPS_RUNS_LOCK:
+        items = list(_OPS_RUNS)[:limit]
+        total = len(_OPS_RUNS)
+    return OpsRunListResponse(items=items, total=total)
 
 
 def create_state_backup(destination_dir: Path | None = None) -> dict[str, Any]:

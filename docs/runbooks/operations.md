@@ -41,6 +41,12 @@ This runbook covers production hardening tasks for sync health, incident respons
 
 ## Backup and Recovery
 
+UI workflow (Task 20):
+- open `Ops` page
+- run `Run backup` (optional destination override)
+- confirm result in `Operations Run History`
+- run `Run maintenance` and verify success status
+
 ### Create backup
 
 ```bash
@@ -71,6 +77,11 @@ Runs:
 - WAL checkpoint truncate
 - `VACUUM`
 - `ANALYZE`
+
+Equivalent API actions used by UI:
+- `POST /v1/ops/backup` with optional payload `{"output_dir":"backups"}`
+- `POST /v1/ops/maintenance`
+- `GET /v1/ops/runs?limit=20`
 
 ## Failure Modes and Actions
 

@@ -6,6 +6,10 @@ import type {
   ExtractResponse,
   HealthResponse,
   MetricsSummaryResponse,
+  OpsActionResponse,
+  OpsBackupRequest,
+  OpsEnvironmentResponse,
+  OpsRunListResponse,
   SyncJobResponse,
   SyncJobListResponse,
   SyncRequest,
@@ -106,6 +110,25 @@ export const apiClient = {
   },
   getEvalArtifacts(): Promise<EvalArtifactsResponse> {
     return requestJson<EvalArtifactsResponse>("/v1/evals/latest");
+  },
+  getOpsEnvironment(): Promise<OpsEnvironmentResponse> {
+    return requestJson<OpsEnvironmentResponse>("/v1/ops/environment");
+  },
+  runOpsBackup(payload: OpsBackupRequest): Promise<OpsActionResponse> {
+    return requestJson<OpsActionResponse>("/v1/ops/backup", {
+      method: "POST",
+      body: payload
+    });
+  },
+  runOpsMaintenance(): Promise<OpsActionResponse> {
+    return requestJson<OpsActionResponse>("/v1/ops/maintenance", {
+      method: "POST"
+    });
+  },
+  listOpsRuns(params: { limit?: number } = {}): Promise<OpsRunListResponse> {
+    const search = new URLSearchParams();
+    search.set("limit", String(params.limit ?? 20));
+    return requestJson<OpsRunListResponse>(`/v1/ops/runs?${search.toString()}`);
   },
   triggerSync(payload: SyncRequest): Promise<SyncResponse> {
     return requestJson<SyncResponse>("/v1/sync/redmine", {

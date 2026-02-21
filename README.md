@@ -71,11 +71,25 @@ make mock-redmine
 - `POST /v1/ask`
 - `POST /v1/sync/redmine`
 - `POST /v1/extract/properties`
+- `GET /v1/metrics/summary`
 
 `POST /v1/ask` behavior:
 - returns only grounded claims derived from retrieved chunks
 - enforces citation marker per claim (`[1]`, `[2]`, ...)
 - returns explicit "not enough evidence" fallback when grounding is insufficient
+
+Deterministic extraction:
+- `POST /v1/extract/properties` computes `issue_metric` + `issue_property` with extractor version `det-v1`.
+- Formula `first_response_s`: seconds between `issue.created_on` and first journal event at/after creation.
+- Formula `resolution_s`: seconds between `issue.created_on` and first transition to a closed status (`issue_status.is_closed=true`), fallback `issue.closed_on`.
+- `reopen_count`: transitions into `Reopened` (or closed -> non-closed fallback).
+- `touch_count`: number of journal records on the issue.
+- `handoff_count`: number of `assigned_to_id` transitions where old/new assignee are both set and differ.
+- Validation markers in `issue_property.props_json.validation`: timestamp anomalies, status chain breaks, missing status values, unknown status IDs.
+
+Metrics summary endpoint:
+- `GET /v1/metrics/summary?project_ids=1&project_ids=2&from_date=2026-02-01T00:00:00Z&to_date=2026-02-21T23:59:59Z`
+- Returns global aggregates and `by_project` breakdown for issues extracted by `det-v1`.
 
 ## Mock Redmine API
 

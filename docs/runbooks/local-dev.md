@@ -59,6 +59,26 @@ For full vector rebuild:
 .venv/bin/python -m redmine_rag.cli index embeddings --full-rebuild
 ```
 
+## Run deterministic extraction
+
+```bash
+.venv/bin/python -m redmine_rag.cli extract run
+```
+
+Or via API:
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/extract/properties \
+  -H 'content-type: application/json' \
+  -d '{}'
+```
+
+## Query workflow metrics summary
+
+```bash
+curl "http://127.0.0.1:8000/v1/metrics/summary?project_ids=1&from_date=2026-02-01T00:00:00Z&to_date=2026-02-21T23:59:59Z"
+```
+
 ## Develop without real Redmine access
 
 ```bash

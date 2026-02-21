@@ -59,3 +59,32 @@ class ExtractResponse(BaseModel):
     accepted: bool
     processed_issues: int
     detail: str
+
+
+class MetricsSummaryByProject(BaseModel):
+    project_id: int
+    issues_total: int
+    issues_with_first_response: int
+    issues_with_resolution: int
+    avg_first_response_s: float | None
+    avg_resolution_s: float | None
+    reopen_total: int
+    touch_total: int
+    handoff_total: int
+
+
+class MetricsSummaryResponse(BaseModel):
+    generated_at: datetime
+    from_date: datetime | None
+    to_date: datetime | None
+    project_ids: list[int]
+    extractor_version: str
+    issues_total: int
+    issues_with_first_response: int
+    issues_with_resolution: int
+    avg_first_response_s: float | None
+    avg_resolution_s: float | None
+    reopen_total: int
+    touch_total: int
+    handoff_total: int
+    by_project: list[MetricsSummaryByProject]

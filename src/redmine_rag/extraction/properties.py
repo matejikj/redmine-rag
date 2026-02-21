@@ -1,14 +1,407 @@
 from __future__ import annotations
 
+import logging
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.orm import selectinload
+
 from redmine_rag.api.schemas import ExtractResponse
+from redmine_rag.db.models import Issue, IssueMetric, IssueProperty, IssueStatus, Journal
+from redmine_rag.db.session import get_session_factory
+
+logger = logging.getLogger(__name__)
+
+EXTRACTOR_VERSION = "det-v1"
+
+
+@dataclass(slots=True)
+class _StatusMeta:
+    name: str
+    is_closed: bool
+
+
+@dataclass(slots=True)
+class _StatusTransition:
+    old_status_id: int | None
+    new_status_id: int | None
+    occurred_at: datetime
+    journal_id: int
+
+
+@dataclass(slots=True)
+class _AssignmentTransition:
+    old_assignee_id: int | None
+    new_assignee_id: int | None
+
+
+@dataclass(slots=True)
+class _IssueExtraction:
+    issue_id: int
+    first_response_s: int | None
+    resolution_s: int | None
+    reopen_count: int
+    touch_count: int
+    handoff_count: int
+    props_json: dict[str, Any]
+    anomaly_count: int
 
 
 async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractResponse:
-    """Placeholder for deterministic + LLM property extraction pipeline."""
+    if issue_ids is not None and not issue_ids:
+        return ExtractResponse(
+            accepted=True,
+            processed_issues=0,
+            detail="No issue IDs provided; nothing to extract.",
+        )
 
-    processed = len(issue_ids) if issue_ids is not None else 0
+    session_factory = get_session_factory()
+    extracted_at = datetime.now(UTC)
+
+    async with session_factory() as session:
+        issue_stmt = select(Issue).options(selectinload(Issue.journals)).order_by(Issue.id.asc())
+        if issue_ids is not None:
+            issue_stmt = issue_stmt.where(Issue.id.in_(issue_ids))
+
+        issues = list((await session.scalars(issue_stmt)).all())
+        if not issues:
+            return ExtractResponse(
+                accepted=True,
+                processed_issues=0,
+                detail="No issues matched extraction scope.",
+            )
+
+        status_rows = (
+            await session.execute(select(IssueStatus.id, IssueStatus.name, IssueStatus.is_closed))
+        ).all()
+        status_meta: dict[int, _StatusMeta] = {
+            int(status_id): _StatusMeta(name=str(name), is_closed=bool(is_closed))
+            for status_id, name, is_closed in status_rows
+        }
+
+        extractions = [_extract_issue(issue, status_meta=status_meta) for issue in issues]
+        metric_rows = [
+            {
+                "issue_id": extraction.issue_id,
+                "first_response_s": extraction.first_response_s,
+                "resolution_s": extraction.resolution_s,
+                "reopen_count": extraction.reopen_count,
+                "touch_count": extraction.touch_count,
+                "handoff_count": extraction.handoff_count,
+            }
+            for extraction in extractions
+        ]
+        property_rows = [
+            {
+                "issue_id": extraction.issue_id,
+                "extractor_version": EXTRACTOR_VERSION,
+                "confidence": 1.0,
+                "props_json": extraction.props_json,
+                "extracted_at": extracted_at,
+            }
+            for extraction in extractions
+        ]
+
+        await _upsert_issue_metrics(session=session, rows=metric_rows)
+        await _upsert_issue_properties(session=session, rows=property_rows)
+        await session.commit()
+
+    total_anomalies = sum(extraction.anomaly_count for extraction in extractions)
+    logger.info(
+        "Deterministic issue extraction finished",
+        extra={
+            "processed_issues": len(extractions),
+            "extractor_version": EXTRACTOR_VERSION,
+            "anomaly_count": total_anomalies,
+            "scope_issue_ids": issue_ids,
+        },
+    )
     return ExtractResponse(
         accepted=True,
-        processed_issues=processed,
-        detail="Extraction pipeline scaffold is ready; implement domain extractors next.",
+        processed_issues=len(extractions),
+        detail=(
+            f"Deterministic extraction completed with {total_anomalies} anomaly markers "
+            f"(extractor={EXTRACTOR_VERSION})."
+        ),
     )
+
+
+def _extract_issue(issue: Issue, *, status_meta: dict[int, _StatusMeta]) -> _IssueExtraction:
+    created_on = _ensure_utc(issue.created_on)
+    journals = sorted(
+        issue.journals,
+        key=lambda journal: (_ensure_utc(journal.created_on), int(journal.id)),
+    )
+
+    status_transitions: list[_StatusTransition] = []
+    assignment_transitions: list[_AssignmentTransition] = []
+    anomalies: set[str] = set()
+    unknown_status_ids: set[int] = set()
+    invalid_transition_count = 0
+    timestamp_anomaly_count = 0
+    touch_count = len(journals)
+    first_response_at: datetime | None = None
+    previous_journal_at: datetime | None = None
+
+    for journal in journals:
+        journal_at = _ensure_utc(journal.created_on)
+        if journal_at < created_on:
+            timestamp_anomaly_count += 1
+            anomalies.add("journal_before_issue_created")
+        if previous_journal_at is not None and journal_at < previous_journal_at:
+            timestamp_anomaly_count += 1
+            anomalies.add("journal_timestamp_out_of_order")
+        previous_journal_at = journal_at
+
+        if first_response_at is None and journal_at >= created_on:
+            first_response_at = journal_at
+
+        for detail in _extract_detail_items(journal):
+            name = str(detail.get("name", "")).strip()
+            if name == "status_id":
+                old_status_id = _to_int_or_none(detail.get("old_value"))
+                new_status_id = _to_int_or_none(detail.get("new_value"))
+                if old_status_id is None or new_status_id is None:
+                    invalid_transition_count += 1
+                    anomalies.add("status_transition_missing_value")
+                status_transitions.append(
+                    _StatusTransition(
+                        old_status_id=old_status_id,
+                        new_status_id=new_status_id,
+                        occurred_at=journal_at,
+                        journal_id=int(journal.id),
+                    )
+                )
+                continue
+
+            if name == "assigned_to_id":
+                assignment_transitions.append(
+                    _AssignmentTransition(
+                        old_assignee_id=_to_int_or_none(detail.get("old_value")),
+                        new_assignee_id=_to_int_or_none(detail.get("new_value")),
+                    )
+                )
+
+    status_path: list[int] = []
+    last_status_id: int | None = None
+    resolution_at: datetime | None = None
+    reopen_count = 0
+
+    for transition in status_transitions:
+        old_status_id = transition.old_status_id
+        new_status_id = transition.new_status_id
+
+        if old_status_id is not None and old_status_id not in status_meta:
+            unknown_status_ids.add(old_status_id)
+            anomalies.add("unknown_status_id")
+        if new_status_id is not None and new_status_id not in status_meta:
+            unknown_status_ids.add(new_status_id)
+            anomalies.add("unknown_status_id")
+
+        if last_status_id is None and old_status_id is not None:
+            status_path.append(old_status_id)
+            last_status_id = old_status_id
+        elif (
+            old_status_id is not None
+            and last_status_id is not None
+            and old_status_id != last_status_id
+        ):
+            invalid_transition_count += 1
+            anomalies.add("status_transition_chain_break")
+            status_path.append(old_status_id)
+            last_status_id = old_status_id
+
+        if new_status_id is not None:
+            status_path.append(new_status_id)
+            if _is_reopen_transition(
+                status_meta=status_meta,
+                old_status_id=old_status_id,
+                new_status_id=new_status_id,
+            ):
+                reopen_count += 1
+            if resolution_at is None and _status_is_closed(status_meta, new_status_id):
+                resolution_at = transition.occurred_at
+            last_status_id = new_status_id
+
+    if not status_path and issue.status_id is not None:
+        status_path.append(int(issue.status_id))
+
+    if resolution_at is None and issue.closed_on is not None:
+        closed_on = _ensure_utc(issue.closed_on)
+        if closed_on >= created_on:
+            resolution_at = closed_on
+        else:
+            anomalies.add("closed_on_before_issue_created")
+
+    if (
+        resolution_at is not None
+        and first_response_at is not None
+        and resolution_at < first_response_at
+    ):
+        anomalies.add("resolution_before_first_response")
+
+    if (
+        issue.closed_on is not None
+        and resolution_at is not None
+        and _ensure_utc(issue.closed_on) < resolution_at
+    ):
+        anomalies.add("closed_on_before_resolution_transition")
+
+    first_response_s = _seconds_since(start=created_on, end=first_response_at)
+    if first_response_at is not None and first_response_s is None:
+        anomalies.add("invalid_first_response_duration")
+
+    resolution_s = _seconds_since(start=created_on, end=resolution_at)
+    if resolution_at is not None and resolution_s is None:
+        anomalies.add("invalid_resolution_duration")
+
+    handoff_count = sum(
+        1
+        for transition in assignment_transitions
+        if transition.old_assignee_id is not None
+        and transition.new_assignee_id is not None
+        and transition.old_assignee_id != transition.new_assignee_id
+    )
+
+    props_json = {
+        "status_path": status_path,
+        "current_status_id": issue.status_id,
+        "current_status": issue.status,
+        "first_response_at": _to_iso(first_response_at),
+        "resolved_at": _to_iso(resolution_at),
+        "validation": {
+            "anomalies": sorted(anomalies),
+            "timestamp_anomaly_count": timestamp_anomaly_count,
+            "invalid_status_transition_count": invalid_transition_count,
+            "unknown_status_ids": sorted(unknown_status_ids),
+        },
+        "event_counts": {
+            "journals": touch_count,
+            "status_transitions": len(status_transitions),
+            "assignment_transitions": len(assignment_transitions),
+        },
+    }
+
+    return _IssueExtraction(
+        issue_id=int(issue.id),
+        first_response_s=first_response_s,
+        resolution_s=resolution_s,
+        reopen_count=reopen_count,
+        touch_count=touch_count,
+        handoff_count=handoff_count,
+        props_json=props_json,
+        anomaly_count=(
+            timestamp_anomaly_count + invalid_transition_count + len(unknown_status_ids)
+        ),
+    )
+
+
+async def _upsert_issue_metrics(*, session: Any, rows: list[dict[str, Any]]) -> None:
+    if not rows:
+        return
+    stmt = sqlite_insert(IssueMetric).values(rows)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["issue_id"],
+        set_={
+            "first_response_s": stmt.excluded.first_response_s,
+            "resolution_s": stmt.excluded.resolution_s,
+            "reopen_count": stmt.excluded.reopen_count,
+            "touch_count": stmt.excluded.touch_count,
+            "handoff_count": stmt.excluded.handoff_count,
+        },
+    )
+    await session.execute(stmt)
+
+
+async def _upsert_issue_properties(*, session: Any, rows: list[dict[str, Any]]) -> None:
+    if not rows:
+        return
+    stmt = sqlite_insert(IssueProperty).values(rows)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["issue_id"],
+        set_={
+            "extractor_version": stmt.excluded.extractor_version,
+            "confidence": stmt.excluded.confidence,
+            "props_json": stmt.excluded.props_json,
+            "extracted_at": stmt.excluded.extracted_at,
+        },
+    )
+    await session.execute(stmt)
+
+
+def _extract_detail_items(journal: Journal) -> list[dict[str, Any]]:
+    details = journal.details
+    if isinstance(details, dict):
+        items = details.get("items")
+        if isinstance(items, list):
+            return [item for item in items if isinstance(item, dict)]
+    if isinstance(details, list):
+        return [item for item in details if isinstance(item, dict)]
+    return []
+
+
+def _is_reopen_transition(
+    *,
+    status_meta: dict[int, _StatusMeta],
+    old_status_id: int | None,
+    new_status_id: int,
+) -> bool:
+    new_name = status_meta.get(new_status_id, _StatusMeta(name="", is_closed=False)).name.lower()
+    if "reopen" in new_name:
+        return True
+    if old_status_id is None:
+        return False
+    return _status_is_closed(status_meta, old_status_id) and not _status_is_closed(
+        status_meta, new_status_id
+    )
+
+
+def _status_is_closed(status_meta: dict[int, _StatusMeta], status_id: int) -> bool:
+    metadata = status_meta.get(status_id)
+    if metadata is None:
+        return False
+    return metadata.is_closed
+
+
+def _ensure_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def _seconds_since(*, start: datetime, end: datetime | None) -> int | None:
+    if end is None:
+        return None
+    delta = int((end - start).total_seconds())
+    if delta < 0:
+        return None
+    return delta
+
+
+def _to_int_or_none(value: object) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return int(stripped)
+        except ValueError:
+            return None
+    return None
+
+
+def _to_iso(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.isoformat()

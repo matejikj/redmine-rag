@@ -24,6 +24,7 @@ from redmine_rag.extraction.llm_structured import (
     load_structured_schema,
     run_structured_extraction,
 )
+from redmine_rag.services.guardrail_service import detect_text_violation, record_guardrail_rejection
 from redmine_rag.services.llm_runtime import resolve_runtime_model
 
 logger = logging.getLogger(__name__)
@@ -123,6 +124,34 @@ async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractRespon
                         issue=issue,
                         max_chars=settings.llm_extract_max_context_chars,
                     )
+                    context_violation = detect_text_violation(issue_context)
+                    if context_violation is not None:
+                        llm_failure_count += 1
+                        extraction.confidence = 0.0
+                        extraction.extractor_version = _combined_extractor_version()
+                        extraction.props_json["llm"] = {
+                            "status": "failed",
+                            "extractor_version": LLM_EXTRACTOR_VERSION,
+                            "prompt_version": PROMPT_VERSION,
+                            "schema_version": SCHEMA_VERSION,
+                            "attempts": 0,
+                            "error_bucket": context_violation,
+                            "latency_ms": 0,
+                            "estimated_cost_usd": 0.0,
+                            "last_error": "Issue context rejected by guardrail before LLM call",
+                            "properties": None,
+                        }
+                        llm_error_buckets[context_violation] = (
+                            llm_error_buckets.get(context_violation, 0) + 1
+                        )
+                        record_guardrail_rejection(
+                            context_violation,
+                            context="extract.issue_context",
+                            detail=issue_context[:180],
+                        )
+                        extractions.append(extraction)
+                        continue
+
                     estimated_cost_usd = _estimate_extraction_cost_usd(issue_context)
                     if (
                         settings.llm_extract_cost_limit_usd > 0

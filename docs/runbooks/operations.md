@@ -11,6 +11,11 @@ This runbook covers production hardening tasks for sync health, incident respons
   - sync job counters (`queued`, `running`, `finished`, `failed`)
   - config/security checks (`outbound_policy`, `secrets`)
   - LLM runtime check (`llm_runtime`) including Ollama reachability/model readiness
+  - guardrail counters (`guardrails`) across buckets:
+    - `prompt_injection`
+    - `ungrounded_claim`
+    - `schema_violation`
+    - `unsafe_content`
 - Sync job visibility:
   - `POST /v1/sync/redmine` creates a traceable job ID
   - `GET /v1/sync/jobs/{job_id}` returns lifecycle and error details
@@ -79,6 +84,10 @@ Runs:
   - verify Ollama server is running and reachable
   - verify `OLLAMA_MODEL` exists in `ollama list`
   - re-run extraction after runtime recovery
+- non-zero `guardrails` counters:
+  - inspect logs for `guardrail_reason` and `guardrail_context`
+  - confirm blocked content is expected (red-team test) or malicious input attempt
+  - if false positives grow, tune guardrail patterns and rerun regression tests
 
 ## Soak Test (Medium Dataset)
 

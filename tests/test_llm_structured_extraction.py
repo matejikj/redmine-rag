@@ -6,6 +6,7 @@ from redmine_rag.extraction import llm_structured
 from redmine_rag.extraction.llm_structured import (
     ERROR_BUCKET_INVALID_JSON,
     ERROR_BUCKET_SCHEMA_VALIDATION,
+    ERROR_BUCKET_UNSAFE_CONTENT,
     build_structured_extraction_client,
     run_structured_extraction,
 )
@@ -147,3 +148,29 @@ async def test_build_structured_extraction_client_supports_ollama_provider(
     )
     parsed = llm_structured.parse_structured_payload(payload)
     assert parsed["topic"] == "oauth"
+
+
+@pytest.mark.asyncio
+async def test_structured_extraction_blocks_unsafe_content_payload() -> None:
+    client = _SequenceClient(
+        [
+            (
+                '{"topic":"oauth","module":"auth","problem_type":"timeout",'
+                '"root_cause":"drop table users",'
+                '"resolution_type":"rollback","customer_impact":"high","risk_flags":["reopened"],'
+                '"next_actions":["update runbook"],"confidence":0.82}'
+            )
+        ]
+    )
+    result = await run_structured_extraction(
+        client=client,
+        system_prompt="x",
+        user_content="y",
+        schema={},
+        model="gpt-5-mini",
+        timeout_s=10,
+        max_retries=0,
+    )
+
+    assert result.success is False
+    assert result.error_bucket == ERROR_BUCKET_UNSAFE_CONTENT

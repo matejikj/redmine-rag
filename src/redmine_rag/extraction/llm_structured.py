@@ -8,6 +8,10 @@ from typing import Any, Literal, Protocol
 import orjson
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
+from redmine_rag.services.guardrail_service import (
+    detect_text_violation,
+    record_guardrail_rejection,
+)
 from redmine_rag.services.llm_runtime import LlmRuntimeClient, build_llm_runtime_client
 
 PROMPT_VERSION = "extract_properties.v1"
@@ -18,6 +22,8 @@ ERROR_BUCKET_INVALID_JSON = "invalid_json"
 ERROR_BUCKET_SCHEMA_VALIDATION = "schema_validation"
 ERROR_BUCKET_TIMEOUT = "timeout"
 ERROR_BUCKET_PROVIDER_ERROR = "provider_error"
+ERROR_BUCKET_PROMPT_INJECTION = "prompt_injection"
+ERROR_BUCKET_UNSAFE_CONTENT = "unsafe_content"
 
 
 class StructuredExtractionClient(Protocol):
@@ -192,6 +198,11 @@ async def run_structured_extraction(
         except ValueError as exc:
             error_bucket = ERROR_BUCKET_INVALID_JSON
             last_error = str(exc)
+            record_guardrail_rejection(
+                "schema_violation",
+                context="extract.llm_payload",
+                detail=last_error[:180] if last_error else None,
+            )
             continue
 
         try:
@@ -199,6 +210,22 @@ async def run_structured_extraction(
         except ValidationError as exc:
             error_bucket = ERROR_BUCKET_SCHEMA_VALIDATION
             last_error = str(exc)
+            record_guardrail_rejection(
+                "schema_violation",
+                context="extract.llm_payload",
+                detail=last_error[:180] if last_error else None,
+            )
+            continue
+
+        guardrail_reason = _detect_payload_violation(payload)
+        if guardrail_reason is not None:
+            error_bucket = guardrail_reason
+            last_error = f"LLM payload rejected by guardrail: {guardrail_reason}"
+            record_guardrail_rejection(
+                guardrail_reason,
+                context="extract.llm_payload",
+                detail=last_error,
+            )
             continue
 
         latency_ms = int((perf_counter() - started) * 1000)
@@ -332,3 +359,30 @@ def _find_first(text: str, candidates: list[str]) -> str | None:
         if candidate in text:
             return candidate
     return None
+
+
+def _detect_payload_violation(
+    payload: dict[str, Any],
+) -> Literal["prompt_injection", "unsafe_content"] | None:
+    for value in payload.values():
+        for text in _iter_text_values(value):
+            reason = detect_text_violation(text)
+            if reason == "prompt_injection" or reason == "unsafe_content":
+                return reason
+    return None
+
+
+def _iter_text_values(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        list_output: list[str] = []
+        for item in value:
+            list_output.extend(_iter_text_values(item))
+        return list_output
+    if isinstance(value, dict):
+        dict_output: list[str] = []
+        for item in value.values():
+            dict_output.extend(_iter_text_values(item))
+        return dict_output
+    return []

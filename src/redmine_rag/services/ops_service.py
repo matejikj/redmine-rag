@@ -16,6 +16,7 @@ from redmine_rag.api.schemas import HealthCheck, HealthResponse, SyncJobCounts
 from redmine_rag.core.config import get_settings
 from redmine_rag.db.models import SyncJob, SyncState
 from redmine_rag.db.session import get_session_factory
+from redmine_rag.services.guardrail_service import guardrail_rejection_counters
 from redmine_rag.services.llm_runtime import is_ollama_provider, probe_llm_runtime
 
 
@@ -177,6 +178,19 @@ async def get_health_status() -> HealthResponse:
                 detail=f"LLM provider '{settings.llm_provider}' has no runtime integration",
             )
         )
+
+    guardrail_counts = guardrail_rejection_counters()
+    guardrail_total = sum(guardrail_counts.values())
+    guardrail_detail = ", ".join(
+        f"{key}={value}" for key, value in sorted(guardrail_counts.items())
+    )
+    checks.append(
+        HealthCheck(
+            name="guardrails",
+            status="warn" if guardrail_total > 0 else "ok",
+            detail=f"Guardrail rejections: {guardrail_detail}",
+        )
+    )
 
     status = "ok"
     if hard_fail:

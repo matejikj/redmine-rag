@@ -117,6 +117,7 @@ Planner notes:
 - planner output includes `normalized_query`, bounded `expansions`, and optional filter hints.
 - planner-suggested IDs are applied only if they exist in local DB domain tables.
 - if planner fails or returns invalid payload, retrieval falls back to original user query.
+- guardrail rejections are tracked by buckets in `/healthz` under `guardrails`.
 
 Or via API:
 

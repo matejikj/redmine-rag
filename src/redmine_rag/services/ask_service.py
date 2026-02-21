@@ -13,6 +13,12 @@ from redmine_rag.api.schemas import AskRequest, AskResponse, Citation
 from redmine_rag.core.config import get_settings
 from redmine_rag.db.session import get_session_factory
 from redmine_rag.services.citation_service import to_citations
+from redmine_rag.services.guardrail_service import (
+    GuardrailReason,
+    detect_text_violation,
+    guardrail_fallback_message,
+    record_guardrail_rejection,
+)
 from redmine_rag.services.llm_runtime import build_llm_runtime_client, resolve_runtime_model
 from redmine_rag.services.retrieval_service import HybridRetrievalResult, hybrid_retrieve
 
@@ -73,6 +79,12 @@ class LlmGroundedAnswer:
     limitations: str | None
 
 
+@dataclass(slots=True)
+class LlmSynthesisResult:
+    answer: LlmGroundedAnswer | None
+    rejection_reason: GuardrailReason | None
+
+
 class LlmClaimPayload(BaseModel):
     text: str = Field(min_length=8, max_length=600)
     citation_ids: list[int] = Field(min_length=1, max_length=_MAX_CITATIONS_PER_CLAIM)
@@ -118,6 +130,15 @@ class LlmAnswerPayload(BaseModel):
 
 async def answer_question(payload: AskRequest) -> AskResponse:
     settings = get_settings()
+    query_violation = detect_text_violation(payload.query)
+    if query_violation is not None:
+        record_guardrail_rejection(
+            query_violation,
+            context="ask.query",
+            detail=payload.query[:180],
+        )
+        return _guardrail_rejection_response(query_violation)
+
     session_factory = get_session_factory()
     async with session_factory() as session:
         retrieval = await hybrid_retrieve(session, payload.query, payload.filters, payload.top_k)
@@ -166,24 +187,32 @@ async def answer_question(payload: AskRequest) -> AskResponse:
         query=payload.query,
         max_claims=min(payload.top_k, settings.ask_llm_max_claims, _MAX_CLAIMS),
     )
-    deterministic_claims = _validate_claims(deterministic_draft_claims, citations)
+    deterministic_claims = _validate_claims(
+        deterministic_draft_claims,
+        citations,
+        source="deterministic",
+    )
     claims = deterministic_claims
     limitations: str | None = None
     synthesis_mode = "deterministic"
+    fallback_reason: GuardrailReason | None = None
 
     if settings.ask_answer_mode == "llm_grounded":
-        llm_answer = await _synthesize_llm_grounded_answer(
+        llm_result = await _synthesize_llm_grounded_answer(
             query=payload.query,
             citations=citations,
             max_claims=min(payload.top_k, settings.ask_llm_max_claims, _MAX_CLAIMS),
             timeout_s=settings.ask_llm_timeout_s,
         )
-        if llm_answer is not None and llm_answer.claims:
-            claims = llm_answer.claims
-            limitations = llm_answer.limitations
+        if llm_result.answer is not None and llm_result.answer.claims:
+            claims = llm_result.answer.claims
+            limitations = llm_result.answer.limitations
             synthesis_mode = "llm_grounded"
         else:
             synthesis_mode = "llm_fallback_deterministic"
+            fallback_reason = llm_result.rejection_reason
+            if fallback_reason is not None:
+                limitations = guardrail_fallback_message(fallback_reason)
 
     logger.info(
         "Ask claim validation finished",
@@ -196,6 +225,7 @@ async def answer_question(payload: AskRequest) -> AskResponse:
             "planner_mode": retrieval.diagnostics.planner_mode,
             "planner_status": retrieval.diagnostics.planner_status,
             "planner_queries": retrieval.diagnostics.planner_queries,
+            "guardrail_rejection_reason": fallback_reason,
         },
     )
 
@@ -212,6 +242,7 @@ async def answer_question(payload: AskRequest) -> AskResponse:
         else _render_answer_markdown(
             claims=claims,
             retrieval=retrieval,
+            guardrail_note=limitations,
         )
     )
     confidence = _estimate_confidence(
@@ -241,13 +272,22 @@ def _no_evidence_response() -> AskResponse:
     )
 
 
+def _guardrail_rejection_response(reason: GuardrailReason) -> AskResponse:
+    return AskResponse(
+        answer_markdown=guardrail_fallback_message(reason),
+        citations=[],
+        used_chunk_ids=[],
+        confidence=0.0,
+    )
+
+
 async def _synthesize_llm_grounded_answer(
     *,
     query: str,
     citations: list[Citation],
     max_claims: int,
     timeout_s: float,
-) -> LlmGroundedAnswer | None:
+) -> LlmSynthesisResult:
     settings = get_settings()
     runtime_client = build_llm_runtime_client(provider=settings.llm_provider, settings=settings)
     model = resolve_runtime_model(settings)
@@ -268,22 +308,50 @@ async def _synthesize_llm_grounded_answer(
             "Ask LLM synthesis failed; falling back to deterministic renderer",
             extra={"error": str(exc), "provider": settings.llm_provider},
         )
-        return None
+        return LlmSynthesisResult(answer=None, rejection_reason=None)
 
     payload = _parse_ask_llm_payload(raw_response)
     if payload is None:
-        return None
+        record_guardrail_rejection(
+            "schema_violation",
+            context="ask.llm_payload",
+            detail="Invalid ask response payload",
+        )
+        return LlmSynthesisResult(answer=None, rejection_reason="schema_violation")
     if payload.insufficient_evidence:
-        return LlmGroundedAnswer(claims=[], limitations=payload.limitations)
+        return LlmSynthesisResult(
+            answer=LlmGroundedAnswer(claims=[], limitations=payload.limitations),
+            rejection_reason=None,
+        )
 
     draft_claims = [
         GroundedClaim(text=claim.text, citation_ids=claim.citation_ids)
         for claim in payload.claims[:max_claims]
     ]
-    validated_claims = _validate_claims(draft_claims, citations)
+    validated_claims = _validate_claims(draft_claims, citations, source="llm")
     if not validated_claims:
-        return None
-    return LlmGroundedAnswer(claims=validated_claims, limitations=payload.limitations)
+        record_guardrail_rejection(
+            "ungrounded_claim",
+            context="ask.llm_payload",
+            detail="No grounded LLM claims remained after validation",
+        )
+        return LlmSynthesisResult(answer=None, rejection_reason="ungrounded_claim")
+
+    limitations = payload.limitations
+    if limitations is not None:
+        limitation_violation = detect_text_violation(limitations)
+        if limitation_violation is not None:
+            record_guardrail_rejection(
+                limitation_violation,
+                context="ask.llm_limitations",
+                detail=limitations[:180],
+            )
+            limitations = guardrail_fallback_message(limitation_violation)
+
+    return LlmSynthesisResult(
+        answer=LlmGroundedAnswer(claims=validated_claims, limitations=limitations),
+        rejection_reason=None,
+    )
 
 
 def _parse_ask_llm_payload(raw_response: str) -> LlmAnswerPayload | None:
@@ -338,18 +406,43 @@ def _build_grounded_claims(
     return claims
 
 
-def _validate_claims(claims: list[GroundedClaim], citations: list[Citation]) -> list[GroundedClaim]:
+def _validate_claims(
+    claims: list[GroundedClaim],
+    citations: list[Citation],
+    *,
+    source: str,
+) -> list[GroundedClaim]:
     allowed_ids = {citation.id for citation in citations}
     snippets_by_id = {citation.id: citation.snippet for citation in citations}
     validated: list[GroundedClaim] = []
 
     for claim in claims:
+        text_violation = detect_text_violation(claim.text)
+        if text_violation is not None:
+            record_guardrail_rejection(
+                text_violation,
+                context=f"ask.claim.{source}",
+                detail=claim.text[:180],
+            )
+            continue
         citation_ids = sorted(
             {citation_id for citation_id in claim.citation_ids if citation_id in allowed_ids}
         )
         if not citation_ids:
+            if source == "llm":
+                record_guardrail_rejection(
+                    "ungrounded_claim",
+                    context="ask.claim.llm",
+                    detail="Claim referenced unsupported citation IDs",
+                )
             continue
         if not _claim_supported_by_snippets(claim.text, citation_ids, snippets_by_id):
+            if source == "llm":
+                record_guardrail_rejection(
+                    "ungrounded_claim",
+                    context="ask.claim.llm",
+                    detail=claim.text[:180],
+                )
             continue
         validated.append(GroundedClaim(text=claim.text, citation_ids=citation_ids))
 
@@ -357,7 +450,10 @@ def _validate_claims(claims: list[GroundedClaim], citations: list[Citation]) -> 
 
 
 def _render_answer_markdown(
-    *, claims: list[GroundedClaim], retrieval: HybridRetrievalResult
+    *,
+    claims: list[GroundedClaim],
+    retrieval: HybridRetrievalResult,
+    guardrail_note: str | None = None,
 ) -> str:
     lines: list[str] = [
         "### Odpověď podložená Redmine zdroji",
@@ -384,6 +480,8 @@ def _render_answer_markdown(
             ),
         ]
     )
+    if guardrail_note:
+        lines.extend(["", "### Bezpečnostní fallback", guardrail_note])
     return "\n".join(lines)
 
 

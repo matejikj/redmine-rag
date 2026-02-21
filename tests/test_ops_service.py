@@ -9,6 +9,10 @@ from redmine_rag.core.config import get_settings
 from redmine_rag.db.base import Base
 from redmine_rag.db.session import get_engine, get_session_factory
 from redmine_rag.services import ops_service
+from redmine_rag.services.guardrail_service import (
+    record_guardrail_rejection,
+    reset_guardrail_rejection_counters,
+)
 from redmine_rag.services.llm_runtime import LlmRuntimeProbe
 from redmine_rag.services.ops_service import (
     create_state_backup,
@@ -134,3 +138,20 @@ async def test_health_reports_degraded_when_ollama_runtime_unreachable(
     assert response.status == "degraded"
     assert llm_check.status == "warn"
     assert "connection refused" in (llm_check.detail or "")
+
+
+@pytest.mark.asyncio
+async def test_health_exposes_guardrail_rejection_counters(
+    isolated_health_env: None,
+) -> None:
+    reset_guardrail_rejection_counters()
+    record_guardrail_rejection("prompt_injection", context="test.health")
+    record_guardrail_rejection("schema_violation", context="test.health")
+
+    response = await get_health_status()
+    guardrail_check = next(check for check in response.checks if check.name == "guardrails")
+
+    assert guardrail_check.status == "warn"
+    assert "prompt_injection=1" in (guardrail_check.detail or "")
+    assert "schema_violation=1" in (guardrail_check.detail or "")
+    reset_guardrail_rejection_counters()

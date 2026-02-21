@@ -91,6 +91,9 @@ make mock-redmine
   - enable with `RETRIEVAL_PLANNER_ENABLED=true`
   - planner emits normalized query + bounded expansions + candidate filter hints
   - planner diagnostics are logged (`planner_mode`, `planner_latency_ms`, `planner_expansions`)
+- includes LLM guardrails and output validation:
+  - rejection buckets: `prompt_injection`, `ungrounded_claim`, `schema_violation`, `unsafe_content`
+  - rejected generations use safe fallback templates and are tracked in health diagnostics
 
 Deterministic extraction:
 - `POST /v1/extract/properties` computes `issue_metric` + `issue_property` with extractor version `det-v1`.

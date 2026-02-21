@@ -17,6 +17,7 @@ help:
 	@echo "  make check       - run all checks"
 	@echo "  make sync        - trigger Redmine sync"
 	@echo "  make reindex     - rebuild doc chunks and FTS index"
+	@echo "  make embed       - refresh vector embeddings"
 	@echo "  make eval        - run local eval scaffold"
 	@echo "  make dataset-quality - validate dataset quality constraints"
 	@echo "  make mock-redmine - run local Mock Redmine API"
@@ -53,6 +54,9 @@ sync:
 
 reindex:
 	$(RUNNER) -m redmine_rag.cli index reindex
+
+embed:
+	$(RUNNER) -m redmine_rag.cli index embeddings
 
 eval:
 	$(RUNNER) scripts/eval/run_eval.py

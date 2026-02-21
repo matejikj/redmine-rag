@@ -43,3 +43,14 @@ Provide feature-level answers from full Redmine data (not only issues/wiki) with
 - Citation traceability for each claim.
 - Incremental updates with overlap window.
 - Portable local development without external infra.
+
+## Hybrid Retrieval Profiling Notes (M1 / 16 GB)
+
+- Default `EMBEDDING_DIM=256` keeps vector memory low while preserving useful semantic recall for local datasets.
+- Candidate fanout is controlled via `RETRIEVAL_CANDIDATE_MULTIPLIER` (default `4`) to cap SQL + fusion overhead.
+- Weighted RRF (`RETRIEVAL_RRF_K=60`) stabilizes ranking when lexical/vector scores are on different scales.
+- Local vector store persists as `numpy` matrix + key metadata on disk; restart does not require recomputing vectors.
+- Recommended local flow for predictable latency:
+  1. run incremental sync (`make sync`)
+  2. keep embeddings refreshed incrementally (automatic in sync; manual with `make embed` when needed)
+  3. use full rebuild (`make reindex`) only after schema/content migrations

@@ -41,6 +41,14 @@ class LocalNumpyVectorStore:
             np.save(fp, self._matrix)
         self.meta_path.write_text(json.dumps(self._keys), encoding="utf-8")
 
+    def clear(self) -> None:
+        self._matrix = np.empty((0, 0), dtype=np.float32)
+        self._keys = []
+
+    @property
+    def keys(self) -> tuple[str, ...]:
+        return tuple(self._keys)
+
     def upsert(self, key: str, vector: np.ndarray) -> None:
         vec = self._normalize(vector.astype(np.float32))
 
@@ -75,6 +83,22 @@ class LocalNumpyVectorStore:
             for index in top_indices
             if scores[index] > 0
         ]
+
+    def remove_keys_not_in(self, allowed_keys: set[str]) -> int:
+        if not self._keys:
+            return 0
+
+        keep_indices = [idx for idx, key in enumerate(self._keys) if key in allowed_keys]
+        removed = len(self._keys) - len(keep_indices)
+        if removed == 0:
+            return 0
+
+        self._keys = [self._keys[idx] for idx in keep_indices]
+        if keep_indices:
+            self._matrix = self._matrix[keep_indices]
+        else:
+            self._matrix = np.empty((0, 0), dtype=np.float32)
+        return removed
 
     @staticmethod
     def _normalize(vector: np.ndarray) -> np.ndarray:

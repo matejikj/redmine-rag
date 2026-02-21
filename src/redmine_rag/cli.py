@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime, timedelta
 
 import typer
 import uvicorn
@@ -9,6 +10,7 @@ from redmine_rag.core.config import get_settings
 from redmine_rag.core.logging import configure_logging
 from redmine_rag.extraction.properties import extract_issue_properties
 from redmine_rag.indexing.chunk_indexer import rebuild_chunk_index
+from redmine_rag.indexing.embedding_indexer import refresh_embeddings
 from redmine_rag.ingestion.sync_pipeline import run_incremental_sync
 
 app = typer.Typer(help="redmine-rag command line")
@@ -47,7 +49,20 @@ def extract_run(issue_id: list[int] | None = typer.Option(None)) -> None:
 @index_app.command("reindex")
 def index_reindex() -> None:
     settings = get_settings()
-    summary = asyncio.run(rebuild_chunk_index(base_url=settings.redmine_base_url))
+    chunk_summary = asyncio.run(rebuild_chunk_index(base_url=settings.redmine_base_url))
+    embedding_summary = asyncio.run(refresh_embeddings(since=None, full_rebuild=True))
+    typer.echo({"chunks": chunk_summary, "embeddings": embedding_summary})
+
+
+@index_app.command("embeddings")
+def index_embeddings(
+    full_rebuild: bool = typer.Option(False, "--full-rebuild"),
+    since_minutes: int | None = typer.Option(None, "--since-minutes"),
+) -> None:
+    since = None
+    if since_minutes is not None:
+        since = datetime.now(UTC) - timedelta(minutes=max(since_minutes, 0))
+    summary = asyncio.run(refresh_embeddings(since=since, full_rebuild=full_rebuild))
     typer.echo(summary)
 
 

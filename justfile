@@ -34,6 +34,9 @@ sync:
 reindex:
   {{python}} -m redmine_rag.cli index reindex
 
+embed:
+  {{python}} -m redmine_rag.cli index embeddings
+
 eval:
   {{python}} scripts/eval/run_eval.py
 

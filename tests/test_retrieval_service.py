@@ -11,13 +11,19 @@ from redmine_rag.core.config import get_settings
 from redmine_rag.db.base import Base
 from redmine_rag.db.models import DocChunk, Issue
 from redmine_rag.db.session import get_engine, get_session_factory
-from redmine_rag.services.retrieval_service import hybrid_retrieve
+from redmine_rag.indexing.embedding_indexer import refresh_embeddings
+from redmine_rag.services.retrieval_service import fuse_rankings, hybrid_retrieve
 
 
 @pytest.fixture
 async def isolated_retrieval_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     db_path = tmp_path / "retrieval_test.db"
+    index_path = tmp_path / "retrieval_vectors.index"
+    meta_path = tmp_path / "retrieval_vectors.meta.json"
     monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{db_path}")
+    monkeypatch.setenv("VECTOR_INDEX_PATH", str(index_path))
+    monkeypatch.setenv("VECTOR_META_PATH", str(meta_path))
+    monkeypatch.setenv("EMBEDDING_DIM", "128")
 
     get_settings.cache_clear()
     get_engine.cache_clear()
@@ -110,16 +116,17 @@ async def test_hybrid_retrieve_uses_fts_hits(isolated_retrieval_db: None) -> Non
         await session.commit()
 
     async with session_factory() as session:
-        results = await hybrid_retrieve(
+        retrieval = await hybrid_retrieve(
             session,
             query="OAuth callback",
             filters=AskFilters(),
             top_k=5,
         )
 
-    assert results
-    assert results[0].source_type == "issue"
-    assert results[0].source_id == "101"
+    assert retrieval.chunks
+    assert retrieval.chunks[0].source_type == "issue"
+    assert retrieval.chunks[0].source_id == "101"
+    assert retrieval.diagnostics.mode == "lexical_only"
 
 
 @pytest.mark.asyncio
@@ -223,5 +230,80 @@ async def test_hybrid_retrieve_applies_issue_filters(isolated_retrieval_db: None
             top_k=5,
         )
 
-    assert filtered
-    assert all(item.source_id == "201" for item in filtered)
+    assert filtered.chunks
+    assert all(item.source_id == "201" for item in filtered.chunks)
+    assert filtered.diagnostics.mode == "lexical_only"
+
+
+def test_fuse_rankings_weighted_rrf() -> None:
+    scores = fuse_rankings(
+        lexical_ids=[10, 11, 12],
+        vector_ids=[12, 10],
+        lexical_weight=0.6,
+        vector_weight=0.4,
+        rrf_k=60,
+    )
+    assert scores[10] > scores[11]
+    assert scores[12] > scores[11]
+    assert scores[10] != scores[12]
+
+
+@pytest.mark.asyncio
+async def test_hybrid_retrieve_uses_vector_candidates_when_embeddings_exist(
+    isolated_retrieval_db: None,
+) -> None:
+    now = datetime.now(UTC)
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        session.add_all(
+            [
+                DocChunk(
+                    source_type="issue",
+                    source_id="501",
+                    project_id=1,
+                    issue_id=501,
+                    chunk_index=0,
+                    text="payment callback timeout and oauth handoff sequence",
+                    url="http://x/issues/501",
+                    source_created_on=now,
+                    source_updated_on=now,
+                    source_metadata={},
+                    embedding_key="vec-501",
+                ),
+                DocChunk(
+                    source_type="issue",
+                    source_id="502",
+                    project_id=1,
+                    issue_id=502,
+                    chunk_index=0,
+                    text="sla escalation war room incident report",
+                    url="http://x/issues/502",
+                    source_created_on=now,
+                    source_updated_on=now,
+                    source_metadata={},
+                    embedding_key="vec-502",
+                ),
+            ]
+        )
+        await session.commit()
+
+    await refresh_embeddings(since=None, full_rebuild=True)
+
+    async with session_factory() as session:
+        first = await hybrid_retrieve(
+            session,
+            query="oauth callback timeout",
+            filters=AskFilters(project_ids=[1]),
+            top_k=5,
+        )
+        second = await hybrid_retrieve(
+            session,
+            query="oauth callback timeout",
+            filters=AskFilters(project_ids=[1]),
+            top_k=5,
+        )
+
+    assert first.diagnostics.mode == "hybrid"
+    assert first.diagnostics.vector_candidates > 0
+    assert first.chunks
+    assert [item.id for item in first.chunks] == [item.id for item in second.chunks]

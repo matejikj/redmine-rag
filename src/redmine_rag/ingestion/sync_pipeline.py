@@ -14,6 +14,8 @@ from redmine_rag.core.config import get_settings
 from redmine_rag.db.models import Project, SyncCursor, SyncState
 from redmine_rag.db.session import get_session_factory
 from redmine_rag.indexing.chunk_indexer import ChunkIndexer
+from redmine_rag.indexing.embedding_indexer import EmbeddingIndexer
+from redmine_rag.indexing.vector_store import LocalNumpyVectorStore
 from redmine_rag.ingestion.redmine_client import RedmineClient
 from redmine_rag.ingestion.repository import IngestionRepository
 
@@ -91,6 +93,9 @@ async def run_incremental_sync(
         "raw_wiki_synced": 0,
         "chunk_sources_reindexed": 0,
         "chunks_updated": 0,
+        "embeddings_processed": 0,
+        "vectors_upserted": 0,
+        "vectors_removed": 0,
         "finished_at": None,
     }
 
@@ -185,6 +190,20 @@ async def run_incremental_sync(
             chunk_stats = await chunk_indexer.refresh(since=chunk_since)
             summary["chunk_sources_reindexed"] = chunk_stats.sources_reindexed
             summary["chunks_updated"] = chunk_stats.chunks_updated
+
+            vector_store = LocalNumpyVectorStore(
+                index_path=settings.vector_index_path,
+                meta_path=settings.vector_meta_path,
+            )
+            embedding_indexer = EmbeddingIndexer(
+                session=session,
+                store=vector_store,
+                embedding_dim=settings.embedding_dim,
+            )
+            embedding_stats = await embedding_indexer.refresh(since=chunk_since, full_rebuild=False)
+            summary["embeddings_processed"] = embedding_stats.processed_chunks
+            summary["vectors_upserted"] = embedding_stats.vectors_upserted
+            summary["vectors_removed"] = embedding_stats.removed_vectors
 
             sync_state.last_success_at = datetime.now(UTC)
             sync_state.last_error = None

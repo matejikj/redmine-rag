@@ -48,6 +48,7 @@ make test
 make check
 make sync
 make reindex
+make embed
 make eval
 make dataset-quality
 make mock-redmine
@@ -96,11 +97,18 @@ You can enable/disable ingestion modules via `.env`:
 REDMINE_MODULES=projects,users,groups,trackers,issue_statuses,issue_priorities,issues,time_entries,news,documents,files,boards,wiki
 REDMINE_BOARD_IDS=94001,94003
 REDMINE_WIKI_PAGES=platform-core:Feature-Login,platform-core:Incident-Triage-Playbook
+EMBEDDING_DIM=256
+RETRIEVAL_LEXICAL_WEIGHT=0.65
+RETRIEVAL_VECTOR_WEIGHT=0.35
+RETRIEVAL_RRF_K=60
+RETRIEVAL_CANDIDATE_MULTIPLIER=4
 ```
 
 - `REDMINE_MODULES`: registry toggle for sync pipeline modules.
 - `REDMINE_BOARD_IDS`: board IDs for board/message ingestion.
 - `REDMINE_WIKI_PAGES`: wiki references in `project_ref:title` format.
+- `EMBEDDING_DIM`: local deterministic embedding dimension.
+- `RETRIEVAL_*`: hybrid fusion parameters (weights, RRF constant, candidate multiplier).
 
 ## Chunking and FTS
 

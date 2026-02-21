@@ -47,6 +47,18 @@ Sync behavior:
 make reindex
 ```
 
+## Refresh embeddings only
+
+```bash
+make embed
+```
+
+For full vector rebuild:
+
+```bash
+.venv/bin/python -m redmine_rag.cli index embeddings --full-rebuild
+```
+
 ## Develop without real Redmine access
 
 ```bash

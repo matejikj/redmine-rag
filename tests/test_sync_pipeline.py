@@ -86,6 +86,8 @@ async def test_incremental_sync_ingests_mock_redmine_without_duplication(
     assert first_summary["wiki_pages_synced"] >= 2
     assert first_summary["chunks_updated"] > 0
     assert first_summary["chunk_sources_reindexed"] > 0
+    assert first_summary["embeddings_processed"] > 0
+    assert first_summary["vectors_upserted"] > 0
 
     session_factory = get_session_factory()
     async with session_factory() as session:

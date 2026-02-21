@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./data/redmine_rag.db"
     vector_index_path: str = "./indexes/chunks.index"
     vector_meta_path: str = "./indexes/chunks.meta.json"
+    embedding_dim: int = 256
+    retrieval_lexical_weight: float = 0.65
+    retrieval_vector_weight: float = 0.35
+    retrieval_rrf_k: int = 60
+    retrieval_candidate_multiplier: int = 4
 
     redmine_base_url: str = "https://redmine.example.com"
     redmine_api_key: str = "replace_me"
@@ -96,6 +101,20 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         raise ValueError("Invalid REDMINE_WIKI_PAGES value")
+
+    @field_validator("embedding_dim", "retrieval_rrf_k", "retrieval_candidate_multiplier")
+    @classmethod
+    def validate_positive_ints(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("Value must be > 0")
+        return value
+
+    @field_validator("retrieval_lexical_weight", "retrieval_vector_weight")
+    @classmethod
+    def validate_weights(cls, value: float) -> float:
+        if value < 0:
+            raise ValueError("Weight must be >= 0")
+        return value
 
     @property
     def data_dir(self) -> Path:

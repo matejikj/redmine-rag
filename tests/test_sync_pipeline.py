@@ -32,6 +32,7 @@ async def isolated_sync_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{db_path}")
     monkeypatch.setenv("REDMINE_BASE_URL", "http://testserver")
     monkeypatch.setenv("REDMINE_API_KEY", "mock-api-key")
+    monkeypatch.setenv("REDMINE_ALLOWED_HOSTS", "testserver,127.0.0.1,localhost")
     monkeypatch.setenv("REDMINE_PROJECT_IDS", "1")
     monkeypatch.setenv(
         "REDMINE_MODULES",

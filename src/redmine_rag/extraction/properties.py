@@ -24,6 +24,7 @@ from redmine_rag.extraction.llm_structured import (
     load_structured_schema,
     run_structured_extraction,
 )
+from redmine_rag.services.llm_runtime import resolve_runtime_model
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,7 @@ async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractRespon
     session_factory = get_session_factory()
     extracted_at = datetime.now(UTC)
     llm_enabled = settings.llm_extract_enabled
+    llm_model = resolve_runtime_model(settings)
     llm_client: StructuredExtractionClient | None = None
     llm_prompt = ""
     llm_schema: dict[str, Any] = {}
@@ -150,7 +152,7 @@ async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractRespon
                         system_prompt=llm_prompt,
                         user_content=issue_context,
                         schema=llm_schema,
-                        model=settings.llm_model,
+                        model=llm_model,
                         timeout_s=settings.llm_extract_timeout_s,
                         max_retries=settings.llm_extract_max_retries,
                     )

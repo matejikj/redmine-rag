@@ -8,6 +8,8 @@ from typing import Any, Literal, Protocol
 import orjson
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
+from redmine_rag.services.llm_runtime import LlmRuntimeClient, build_llm_runtime_client
+
 PROMPT_VERSION = "extract_properties.v1"
 SCHEMA_VERSION = "extract_properties.schema.v1"
 LLM_EXTRACTOR_VERSION = "llm-json-v1"
@@ -102,6 +104,28 @@ class MockStructuredExtractionClient:
         return orjson.dumps(output).decode("utf-8")
 
 
+class RuntimeStructuredExtractionClient:
+    def __init__(self, runtime_client: LlmRuntimeClient) -> None:
+        self._runtime_client = runtime_client
+
+    async def extract(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+        schema: dict[str, Any],
+        model: str,
+        timeout_s: float,
+    ) -> str:
+        return await self._runtime_client.generate(
+            model=model,
+            prompt=user_content,
+            system_prompt=system_prompt,
+            timeout_s=timeout_s,
+            response_schema=schema,
+        )
+
+
 class UnsupportedStructuredExtractionClient:
     def __init__(self, provider: str) -> None:
         self._provider = provider
@@ -123,6 +147,9 @@ def build_structured_extraction_client(provider: str) -> StructuredExtractionCli
     normalized_provider = provider.strip().lower()
     if normalized_provider in {"mock", "heuristic", "test"}:
         return MockStructuredExtractionClient()
+    if normalized_provider == "ollama":
+        runtime_client = build_llm_runtime_client(provider=normalized_provider)
+        return RuntimeStructuredExtractionClient(runtime_client=runtime_client)
     return UnsupportedStructuredExtractionClient(provider=normalized_provider)
 
 

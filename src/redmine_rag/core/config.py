@@ -61,6 +61,10 @@ class Settings(BaseSettings):
 
     llm_provider: str = "api"
     llm_model: str = "gpt-5-mini"
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_model: str = "Mistral-7B-Instruct-v0.3-Q4_K_M"
+    ollama_timeout_s: float = 45.0
+    ollama_max_concurrency: int = 2
     llm_extract_enabled: bool = False
     llm_extract_max_retries: int = 2
     llm_extract_batch_size: int = 20
@@ -136,6 +140,7 @@ class Settings(BaseSettings):
         "llm_extract_batch_size",
         "llm_extract_max_context_chars",
         "sync_job_history_limit",
+        "ollama_max_concurrency",
     )
     @classmethod
     def validate_positive_ints(cls, value: int) -> int:
@@ -154,6 +159,7 @@ class Settings(BaseSettings):
         "llm_extract_timeout_s",
         "llm_extract_cost_limit_usd",
         "redmine_http_timeout_s",
+        "ollama_timeout_s",
     )
     @classmethod
     def validate_non_negative_floats(cls, value: float) -> float:
@@ -176,6 +182,23 @@ class Settings(BaseSettings):
             raise ValueError("REDMINE_BASE_URL must be absolute URL")
         if parsed.scheme not in {"http", "https"}:
             raise ValueError("REDMINE_BASE_URL must use http or https")
+        return value.strip()
+
+    @field_validator("ollama_base_url")
+    @classmethod
+    def validate_ollama_base_url(cls, value: str) -> str:
+        parsed = urlparse(value.strip())
+        if not parsed.scheme or not parsed.netloc:
+            raise ValueError("OLLAMA_BASE_URL must be absolute URL")
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError("OLLAMA_BASE_URL must use http or https")
+        return value.strip()
+
+    @field_validator("ollama_model")
+    @classmethod
+    def validate_ollama_model(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("OLLAMA_MODEL must not be empty")
         return value.strip()
 
     @property

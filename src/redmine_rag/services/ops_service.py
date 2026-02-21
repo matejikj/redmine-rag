@@ -16,6 +16,7 @@ from redmine_rag.api.schemas import HealthCheck, HealthResponse, SyncJobCounts
 from redmine_rag.core.config import get_settings
 from redmine_rag.db.models import SyncJob, SyncState
 from redmine_rag.db.session import get_session_factory
+from redmine_rag.services.llm_runtime import is_ollama_provider, probe_llm_runtime
 
 
 async def get_health_status() -> HealthResponse:
@@ -120,6 +121,60 @@ async def get_health_status() -> HealthResponse:
                 name="sync_jobs",
                 status="warn",
                 detail=f"There are {sync_counts.failed} failed sync jobs",
+            )
+        )
+
+    if not settings.llm_extract_enabled:
+        checks.append(
+            HealthCheck(
+                name="llm_runtime",
+                status="ok",
+                detail="LLM extraction is disabled",
+            )
+        )
+    elif settings.llm_provider.strip().lower() in {"mock", "heuristic", "test"}:
+        checks.append(
+            HealthCheck(
+                name="llm_runtime",
+                status="ok",
+                detail=f"LLM provider '{settings.llm_provider}' is local deterministic mock",
+            )
+        )
+    elif is_ollama_provider(settings.llm_provider):
+        probe = await probe_llm_runtime(settings)
+        if not probe.available:
+            checks.append(
+                HealthCheck(
+                    name="llm_runtime",
+                    status="warn",
+                    detail=probe.detail,
+                    latency_ms=probe.latency_ms,
+                )
+            )
+        elif probe.model_available is False:
+            checks.append(
+                HealthCheck(
+                    name="llm_runtime",
+                    status="warn",
+                    detail=probe.detail,
+                    latency_ms=probe.latency_ms,
+                )
+            )
+        else:
+            checks.append(
+                HealthCheck(
+                    name="llm_runtime",
+                    status="ok",
+                    detail=probe.detail,
+                    latency_ms=probe.latency_ms,
+                )
+            )
+    else:
+        checks.append(
+            HealthCheck(
+                name="llm_runtime",
+                status="warn",
+                detail=f"LLM provider '{settings.llm_provider}' has no runtime integration",
             )
         )
 

@@ -10,6 +10,7 @@ This runbook covers production hardening tasks for sync health, incident respons
   - DB probe status and latency
   - sync job counters (`queued`, `running`, `finished`, `failed`)
   - config/security checks (`outbound_policy`, `secrets`)
+  - LLM runtime check (`llm_runtime`) including Ollama reachability/model readiness
 - Sync job visibility:
   - `POST /v1/sync/redmine` creates a traceable job ID
   - `GET /v1/sync/jobs/{job_id}` returns lifecycle and error details
@@ -74,6 +75,10 @@ Runs:
 - degraded security checks in production:
   - rotate `REDMINE_API_KEY`
   - enforce `REDMINE_ALLOWED_HOSTS`
+- degraded `llm_runtime` with `LLM_PROVIDER=ollama`:
+  - verify Ollama server is running and reachable
+  - verify `OLLAMA_MODEL` exists in `ollama list`
+  - re-run extraction after runtime recovery
 
 ## Soak Test (Medium Dataset)
 
@@ -91,6 +96,8 @@ Use this before release candidates to verify repeated incremental sync stability
 - `RETRIEVAL_CANDIDATE_MULTIPLIER=4`
 - `LLM_EXTRACT_BATCH_SIZE=20`
 - `REDMINE_HTTP_TIMEOUT_S=30`
+- `OLLAMA_TIMEOUT_S=45`
+- `OLLAMA_MAX_CONCURRENCY=2`
 
 ### Server
 

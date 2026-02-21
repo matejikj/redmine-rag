@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import pytest
 
+from redmine_rag.extraction import llm_structured
 from redmine_rag.extraction.llm_structured import (
     ERROR_BUCKET_INVALID_JSON,
     ERROR_BUCKET_SCHEMA_VALIDATION,
+    build_structured_extraction_client,
     run_structured_extraction,
 )
 
@@ -106,3 +108,42 @@ async def test_structured_extraction_tracks_invalid_json_bucket() -> None:
     assert result.success is False
     assert result.attempts == 2
     assert result.error_bucket == ERROR_BUCKET_INVALID_JSON
+
+
+@pytest.mark.asyncio
+async def test_build_structured_extraction_client_supports_ollama_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakeRuntimeClient:
+        async def generate(
+            self,
+            *,
+            model: str,
+            prompt: str,
+            system_prompt: str | None,
+            timeout_s: float,
+            response_schema: dict[str, object] | None,
+        ) -> str:
+            del model, prompt, system_prompt, timeout_s, response_schema
+            return (
+                '{"topic":"oauth","module":"auth","problem_type":"timeout","root_cause":null,'
+                '"resolution_type":"rollback","customer_impact":"medium","risk_flags":[],'
+                '"next_actions":["monitor issue"],"confidence":0.71}'
+            )
+
+    monkeypatch.setattr(
+        llm_structured,
+        "build_llm_runtime_client",
+        lambda *args, **kwargs: _FakeRuntimeClient(),
+    )
+    client = build_structured_extraction_client("ollama")
+
+    payload = await client.extract(
+        system_prompt="sys",
+        user_content="ctx",
+        schema={},
+        model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+        timeout_s=10.0,
+    )
+    parsed = llm_structured.parse_structured_payload(payload)
+    assert parsed["topic"] == "oauth"

@@ -84,6 +84,23 @@ export LLM_EXTRACT_COST_LIMIT_USD=1.0
 
 For local development the default provider `mock` is deterministic and offline.
 
+Use local Ollama runtime instead of mock:
+
+```bash
+ollama pull Mistral-7B-Instruct-v0.3-Q4_K_M
+export LLM_PROVIDER=ollama
+export OLLAMA_BASE_URL=http://127.0.0.1:11434
+export OLLAMA_MODEL=Mistral-7B-Instruct-v0.3-Q4_K_M
+export OLLAMA_TIMEOUT_S=45
+export OLLAMA_MAX_CONCURRENCY=2
+```
+
+Runtime readiness is visible in:
+
+```bash
+curl http://127.0.0.1:8000/healthz
+```
+
 Or via API:
 
 ```bash

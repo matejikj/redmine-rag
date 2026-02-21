@@ -96,6 +96,10 @@ Deterministic extraction:
 
 LLM structured extraction (JSON Schema):
 - Enabled by `LLM_EXTRACT_ENABLED=true` and runs inside `POST /v1/extract/properties`.
+- Local Ollama provider is supported (`LLM_PROVIDER=ollama`) with configurable runtime keys:
+  - `OLLAMA_BASE_URL` (default `http://127.0.0.1:11434`)
+  - `OLLAMA_MODEL` (default `Mistral-7B-Instruct-v0.3-Q4_K_M`)
+  - `OLLAMA_TIMEOUT_S`, `OLLAMA_MAX_CONCURRENCY`
 - Prompt and schema are versioned in repo:
   - `prompts/extract_properties_v1.md`
   - `prompts/extract_properties_schema_v1.json`
@@ -111,6 +115,16 @@ LLM structured extraction (JSON Schema):
 - Version strategy:
   - deterministic-only rows keep `extractor_version=det-v1`
   - deterministic + LLM rows store `extractor_version=det-v1+llm-json-v1`
+
+Ollama local setup example:
+
+```bash
+ollama pull Mistral-7B-Instruct-v0.3-Q4_K_M
+export LLM_PROVIDER=ollama
+export LLM_EXTRACT_ENABLED=true
+export OLLAMA_BASE_URL=http://127.0.0.1:11434
+export OLLAMA_MODEL=Mistral-7B-Instruct-v0.3-Q4_K_M
+```
 
 Metrics summary endpoint:
 - `GET /v1/metrics/summary?project_ids=1&project_ids=2&from_date=2026-02-01T00:00:00Z&to_date=2026-02-21T23:59:59Z`

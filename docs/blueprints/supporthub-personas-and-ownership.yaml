@@ -1,0 +1,56 @@
+users:
+  expected_count_range: [15, 30]
+  required_roles:
+    - Support Agent
+    - Tech Lead
+    - Product Owner
+    - Customer Success
+    - Security Engineer
+
+groups:
+  - name: SupportHub Incident Command
+    purpose: coordinate major incidents and escalations
+  - name: SupportHub Identity Squad
+    purpose: authentication and security controls
+  - name: SupportHub SLA Automation
+    purpose: SLA and escalation rule implementation
+  - name: SupportHub Timeline & Data
+    purpose: timeline, analytics, and data integrity
+  - name: SupportHub Knowledge Guild
+    purpose: article quality and documentation governance
+  - name: SupportHub Agent Pool
+    purpose: L1/L2 intake and triage
+  - name: SupportHub Product Council
+    purpose: prioritization and customer impact alignment
+
+ownership:
+  Authentication:
+    author_pool: [3, 1, 13]
+    assignee_pool: [1, 13, 6]
+    watcher_pool: [2, 7, 17, 18]
+  SLA Automation:
+    author_pool: [3, 2, 8]
+    assignee_pool: [2, 10, 15]
+    watcher_pool: [7, 17, 19, 3]
+  Evidence Timeline:
+    author_pool: [8, 3, 16]
+    assignee_pool: [13, 16, 10]
+    watcher_pool: [2, 7, 17, 8]
+  Knowledge Base:
+    author_pool: [14, 20, 3]
+    assignee_pool: [14, 20, 4]
+    watcher_pool: [7, 19, 11, 12]
+  Reporting & Citations:
+    author_pool: [8, 3, 14]
+    assignee_pool: [8, 16, 17]
+    watcher_pool: [2, 7, 19, 20]
+
+security:
+  private_issue_assignee_pool: [6, 18]
+
+assignment_rules:
+  - author_selected_from_workstream_pool
+  - assignee_selected_from_workstream_pool
+  - private_issue_forces_security_assignee
+  - journals_use_author_assignee_and_watcher_participants
+  - watchers_include_customer_success_or_incident_role

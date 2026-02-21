@@ -1,0 +1,2 @@
+{"id":"gq-001","claims_total":6,"claims_with_citation":6,"claims_grounded":5,"retrieved_sources":[{"source_type":"issue","source_id":101},{"source_type":"wiki","source_id":"Feature-Login"}],"cited_sources":[{"source_type":"issue","source_id":101},{"source_type":"wiki","source_id":"Feature-Login"}]}
+{"id":"gq-002","claims_total":5,"claims_with_citation":4,"claims_grounded":4,"retrieved_sources":[{"source_type":"issue","source_id":102},{"source_type":"message","source_id":95003}],"cited_sources":[{"source_type":"issue","source_id":102}]}

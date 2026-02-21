@@ -45,6 +45,7 @@ make test
 make check
 make sync
 make eval
+make dataset-quality
 make mock-redmine
 ```
 

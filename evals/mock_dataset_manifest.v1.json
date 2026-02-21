@@ -1,0 +1,45 @@
+{
+  "dataset_id": "supporthub_mock_dataset_v1",
+  "version": "v1.0.0",
+  "default_profile": "large",
+  "profile_env_var": "MOCK_REDMINE_DATASET_PROFILE",
+  "profiles": {
+    "small": {
+      "bulk_issues": 120,
+      "bulk_wiki_pages": 12,
+      "bulk_news": 8,
+      "bulk_documents": 10,
+      "bulk_files": 12,
+      "bulk_ops_topics": 8
+    },
+    "medium": {
+      "bulk_issues": 170,
+      "bulk_wiki_pages": 16,
+      "bulk_news": 12,
+      "bulk_documents": 14,
+      "bulk_files": 18,
+      "bulk_ops_topics": 10
+    },
+    "large": {
+      "bulk_issues": 215,
+      "bulk_wiki_pages": 20,
+      "bulk_news": 15,
+      "bulk_documents": 18,
+      "bulk_files": 24,
+      "bulk_ops_topics": 12
+    }
+  },
+  "semantic_contract": {
+    "project_scope": "single project platform-core",
+    "required_issue_classes": ["Epic", "Feature", "Bug", "Support", "Incident"],
+    "required_statuses": ["New", "In Progress", "Resolved", "Reopened", "Closed"],
+    "required_relation_types": ["blocks", "relates", "duplicates"],
+    "required_noise_categories": [
+      "Incomplete Description",
+      "Missing Workflow Stage",
+      "Inconsistent Priority Signal",
+      "Noisy Language",
+      "Legacy Terminology"
+    ]
+  }
+}

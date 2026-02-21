@@ -16,6 +16,7 @@ help:
 	@echo "  make check       - run all checks"
 	@echo "  make sync        - trigger Redmine sync"
 	@echo "  make eval        - run local eval scaffold"
+	@echo "  make dataset-quality - validate dataset quality constraints"
 	@echo "  make mock-redmine - run local Mock Redmine API"
 
 bootstrap:
@@ -50,6 +51,9 @@ sync:
 
 eval:
 	$(PYTHON) scripts/eval/run_eval.py
+
+dataset-quality:
+	$(PYTHON) scripts/eval/check_mock_dataset_quality.py --all-profiles
 
 mock-redmine:
 	./scripts/mock-redmine.sh

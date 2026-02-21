@@ -12,6 +12,17 @@ make mock-redmine
 
 Default endpoint: `http://127.0.0.1:8081`
 
+Optional dataset scale profile (default `large`):
+
+```bash
+MOCK_REDMINE_DATASET_PROFILE=small make mock-redmine
+```
+
+Available profiles:
+- `small`
+- `medium`
+- `large`
+
 ## Configure app to use mock API
 
 In `.env`:
@@ -54,4 +65,12 @@ No code changes are required for cutover.
 
 - Auth header is required: `X-Redmine-API-Key`.
 - Default mock API key is `mock-api-key`.
-- Private project access is allowed only with header `X-Mock-Role: admin`.
+- Private records (private issues and private boards) are visible only with `X-Mock-Role: admin`.
+- Dataset is intentionally large (200+ issues) to simulate realistic sync and retrieval load.
+- Fixtures are coherent around one project theme (`platform-core` / SupportHub Platform).
+- Dataset governance baseline and changelog are stored in `evals/mock_dataset_manifest.v1.json` and `evals/CHANGELOG.md`.
+- Run profile quality checks with:
+
+```bash
+make dataset-quality
+```

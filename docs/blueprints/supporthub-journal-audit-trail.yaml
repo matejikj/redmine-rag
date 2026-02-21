@@ -1,0 +1,47 @@
+project:
+  id: 1
+  identifier: platform-core
+  name: SupportHub Platform
+
+journal_model:
+  required_styles:
+    - operational_update
+    - technical_analysis
+    - decision_log
+    - postmortem_summary
+  required_context:
+    - customer_account
+    - support_channel
+    - region
+    - root_cause
+    - remediation_action
+    - prevention_followup
+
+audit_trail:
+  required_detail_fields:
+    - status_id
+    - assigned_to_id
+    - priority_id
+    - done_ratio
+  rules:
+    - non_new_issue_must_have_status_transition
+    - final_status_transition_matches_issue_status
+    - done_ratio_progression_ends_at_issue_done_ratio
+    - assignment_change_captured_when_handoff_occurs
+    - priority_change_captured_when_reprioritization_occurs
+
+privacy:
+  required_mix:
+    - public_notes
+    - private_notes
+  private_constraints:
+    - private_issues_include_private_journal
+    - incident_or_security_decisions_can_be_private
+
+quality:
+  banned_short_notes:
+    - done
+    - fixed
+    - ok
+    - resolved
+  minimum_words_per_note: 10

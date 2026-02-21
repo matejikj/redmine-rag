@@ -1,0 +1,48 @@
+dataset:
+  id: supporthub_golden_v1
+  path: evals/supporthub_golden_v1.jsonl
+  query_count: 50
+  allowed_range:
+    min: 40
+    max: 80
+
+query_contract:
+  required_fields:
+    - id
+    - query
+    - language
+    - difficulty
+    - expected_answer_type
+    - filters
+    - expected_source_types
+    - expected_sources
+    - tags
+
+coverage:
+  answer_types:
+    - feature_overview
+    - root_cause_summary
+    - incident_timeline
+    - sla_analysis
+    - communication_summary
+    - data_quality_audit
+  source_types:
+    - issue
+    - journal
+    - attachment
+    - wiki
+    - news
+    - document
+    - file
+    - message
+
+metrics:
+  - citation_coverage
+  - groundedness
+  - retrieval_hit_rate
+  - source_type_coverage
+
+reproducibility:
+  generator_script: scripts/eval/build_supporthub_golden.py
+  deterministic: true
+  random_sampling: false

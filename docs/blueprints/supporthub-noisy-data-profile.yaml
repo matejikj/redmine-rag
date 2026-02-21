@@ -1,0 +1,42 @@
+project:
+  id: 1
+  identifier: platform-core
+  name: SupportHub Platform
+
+noise_profile:
+  deterministic: true
+  signal_field: Data Quality Flag
+  categories:
+    - Incomplete Description
+    - Missing Workflow Stage
+    - Inconsistent Priority Signal
+    - Noisy Language
+    - Legacy Terminology
+
+constraints:
+  noisy_subset_min: 30
+  noisy_subset_max: 120
+  missing_workflow_stage_min: 3
+  missing_workflow_stage_max: 20
+
+language_mix:
+  required_tokens:
+    - zákazník
+    - chybí
+    - FYI
+    - pls
+
+legacy_artifacts:
+  required_terms:
+    - legacy
+    - deprecated
+
+cross_entity_presence:
+  required_entities:
+    - issues
+    - journals
+    - wiki
+    - news
+    - documents
+    - files
+    - messages

@@ -1,0 +1,61 @@
+project:
+  id: 1
+  identifier: platform-core
+  name: SupportHub Platform
+
+knowledge_layer:
+  entities:
+    - wiki
+    - news
+    - documents
+    - files
+  requirements:
+    - every_entity_references_issue_context
+    - topics_align_with_issue_module_scenario_risk
+    - artifacts_support_direct_citation
+
+wiki:
+  generated_pages: 20
+  required_topic_families:
+    - sla_metrics
+    - evidence_timeline
+    - root_cause_catalog
+    - escalation_policy
+    - citation_quality
+  quality_rules:
+    - generated_versions_at_least_2
+    - include_primary_and_related_issue_ids
+    - include_parent_link_to_core_playbook
+
+news:
+  required_story_types:
+    - release_update
+    - incident_review
+    - process_change
+  quality_rules:
+    - include_issue_references
+    - include_related_wiki_or_document_reference
+
+documents:
+  generated_documents: 18
+  required_kinds:
+    - release_readiness
+    - incident_review
+    - process_change
+    - knowledge_remediation
+  quality_rules:
+    - include_issue_references
+    - include_wiki_reference
+
+files:
+  generated_files: 24
+  required_artifact_types:
+    - diagnostic_log
+    - rollback_checklist
+    - evidence_export
+    - timeline_snapshot
+    - postmortem_notes
+    - query_plan
+  quality_rules:
+    - filename_contains_issue_reference
+    - description_contains_issue_reference

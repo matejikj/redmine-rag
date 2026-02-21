@@ -1,0 +1,128 @@
+project:
+  id: 1
+  identifier: platform-core
+  name: SupportHub Platform
+  objective: >-
+    Improve support operations by reducing response times and increasing
+    evidence-backed incident resolution quality.
+
+roles:
+  - id: support_agent
+    name: Support Agent
+    responsibilities:
+      - intake
+      - first_response
+      - customer_follow_up
+  - id: tech_lead
+    name: Tech Lead
+    responsibilities:
+      - root_cause
+      - remediation_decisions
+      - technical_validation
+  - id: product_owner
+    name: Product Owner
+    responsibilities:
+      - prioritization
+      - acceptance_criteria
+      - scope_decisions
+  - id: customer_success
+    name: Customer Success
+    responsibilities:
+      - impact_assessment
+      - communication_quality
+  - id: security_engineer
+    name: Security Engineer
+    responsibilities:
+      - private_incident_review
+      - risk_classification
+      - compliance_notes
+
+workstreams:
+  - Authentication
+  - SLA Automation
+  - Evidence Timeline
+  - Knowledge Base
+  - Reporting & Citations
+
+trackers:
+  - Bug
+  - Feature
+  - Support
+
+statuses:
+  - New
+  - In Progress
+  - Resolved
+  - Closed
+
+priorities:
+  - Low
+  - Normal
+  - High
+  - Urgent
+
+required_custom_fields:
+  - Module
+  - Workstream
+  - Customer Segment
+  - Customer Impact
+  - Workflow Stage
+
+sla:
+  first_response_minutes:
+    Urgent: 15
+    High: 60
+    Normal: 240
+    Low: 1440
+  resolution_hours:
+    Urgent: 8
+    High: 24
+    Normal: 120
+    Low: 240
+
+entity_relations:
+  - from: issue
+    to: journal
+    cardinality: one_to_many
+  - from: issue
+    to: time_entry
+    cardinality: one_to_many
+  - from: issue
+    to: attachment
+    cardinality: one_to_many
+  - from: issue
+    to: issue
+    cardinality: many_to_many
+    via: relations
+  - from: wiki_page
+    to: wiki_version
+    cardinality: one_to_many
+  - from: board
+    to: message
+    cardinality: one_to_many
+  - from: message
+    to: message
+    cardinality: one_to_many
+    via: replies
+
+consistency_rules:
+  hard:
+    - all entities use project_id=1
+    - issue.updated_on >= max(journal.created_on, time_entry.updated_on)
+    - closed_on set only for terminal statuses
+    - private issue must include at least one private journal
+    - relation targets must exist
+    - attachment parents must exist
+  soft:
+    - at least 20 percent issues include technical evidence attachments
+    - at least 15 percent issues are reopened
+    - at least 30 percent issues reference wiki/document context
+    - at least 10 percent issues contain cross-team handoff history
+
+scenario_families:
+  - SLA drift
+  - Escalation loop
+  - Knowledge gap
+  - Evidence mismatch
+  - Security incident
+  - False closure

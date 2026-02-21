@@ -155,6 +155,27 @@ def _project_visibility_or_403(project_id: int, auth: AuthContext) -> None:
         raise HTTPException(status_code=404, detail="Not found")
 
 
+def _is_issue_visible(issue: dict[str, Any], auth: AuthContext) -> bool:
+    if not _is_project_visible(issue["project_id"], auth):
+        return False
+    if issue.get("is_private", False) and not auth.can_access_private:
+        return False
+    return True
+
+
+def _issue_visibility_or_403(issue: dict[str, Any], auth: AuthContext) -> None:
+    if not _is_project_visible(issue["project_id"], auth):
+        _project_visibility_or_403(issue["project_id"], auth)
+    if issue.get("is_private", False) and not auth.can_access_private:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+def _board_visibility_or_403(board: dict[str, Any], auth: AuthContext) -> None:
+    _project_visibility_or_403(board["project_id"], auth)
+    if board.get("is_private", False) and not auth.can_access_private:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
 def _parse_includes(include_raw: str | None) -> set[str]:
     if include_raw is None or not include_raw.strip():
         return set()
@@ -363,6 +384,7 @@ def list_issues(
     include_fields = _parse_includes(include)
 
     filtered = _filter_visible_project_items(ISSUES, auth, project_ids=project_ids)
+    filtered = [issue for issue in filtered if _is_issue_visible(issue, auth)]
     filtered = [
         issue for issue in filtered if _matches_updated_filter(issue["updated_on"], updated_filter)
     ]
@@ -382,7 +404,7 @@ def issue_detail(
     if issue is None:
         raise HTTPException(status_code=404, detail="Not found")
 
-    _project_visibility_or_403(issue["project_id"], auth)
+    _issue_visibility_or_403(issue, auth)
     include_fields = _parse_includes(include)
     return {"issue": _serialize_issue(issue, include_fields=include_fields)}
 
@@ -515,7 +537,7 @@ def list_board_topics(
     if board is None:
         raise HTTPException(status_code=404, detail="Not found")
 
-    _project_visibility_or_403(board["project_id"], auth)
+    _board_visibility_or_403(board, auth)
 
     topics = [
         message
@@ -549,7 +571,10 @@ def message_detail(
     if message is None:
         raise HTTPException(status_code=404, detail="Not found")
 
-    _project_visibility_or_403(message["project_id"], auth)
+    board = BOARD_BY_ID.get(message["board_id"])
+    if board is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    _board_visibility_or_403(board, auth)
     replies = [
         {
             "id": reply["id"],

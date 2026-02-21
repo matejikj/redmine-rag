@@ -1,0 +1,71 @@
+project:
+  id: 1
+  identifier: platform-core
+  name: SupportHub Platform
+
+backlog:
+  minimum_issues: 120
+  story_arc_size: 5
+  issue_classes:
+    - Epic
+    - Feature
+    - Bug
+    - Support
+    - Incident
+
+statuses:
+  required:
+    - New
+    - In Progress
+    - Resolved
+    - Closed
+    - Reopened
+  reopened_classes:
+    - Bug
+    - Incident
+  closed_on_allowed_for:
+    - Resolved
+    - Closed
+
+dependencies:
+  required_relation_types:
+    - blocks
+    - relates
+    - duplicates
+  arc_pattern:
+    feature_to_epic: blocks
+    bug_to_feature: relates
+    support_to_bug: duplicates_or_relates
+    incident_to_support: blocks_or_duplicates
+
+edge_cases:
+  required:
+    - Reopened
+    - Stalled
+    - Mis-prioritized
+  encoded_in_field: Risk Flag
+
+metadata:
+  required_custom_fields:
+    - Module
+    - Customer Impact
+    - Workflow Stage
+    - Workstream
+    - Customer Segment
+    - Issue Class
+    - Scenario Family
+    - Risk Flag
+    - Customer Account
+
+quality:
+  uniqueness:
+    subject: strict_unique
+    description: strict_unique
+  realism_signals:
+    - account_context
+    - channel_context
+    - region_context
+    - symptom_context
+    - root_cause_hypothesis
+    - remediation_plan
+    - prevention_action

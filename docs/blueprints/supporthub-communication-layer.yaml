@@ -1,0 +1,38 @@
+project:
+  id: 1
+  identifier: platform-core
+  name: SupportHub Platform
+
+communication_layer:
+  boards:
+    - id: 94001
+      name: Architecture Discussions
+      visibility: public
+      purpose: architecture_tradeoffs
+    - id: 94003
+      name: Operations Cadence
+      visibility: public
+      purpose: weekly_operational_followup
+    - id: 94002
+      name: Security Review Board
+      visibility: private
+      purpose: security_and_prod_incident_coordination
+
+thread_requirements:
+  required_references:
+    - issue_reference
+    - document_reference
+  decision_markers:
+    - "Decision:"
+    - "Decision point:"
+  operational_topics_require_reply: true
+
+coverage:
+  public_thread_mix:
+    - architecture_review
+    - operations_review
+  private_security_context: required
+
+visibility_rules:
+  public_access: standard_api_auth
+  private_access: admin_only

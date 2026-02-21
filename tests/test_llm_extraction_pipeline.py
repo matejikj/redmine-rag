@@ -11,6 +11,10 @@ from redmine_rag.db.base import Base
 from redmine_rag.db.models import Issue, IssueProperty, IssueStatus, Journal, Project
 from redmine_rag.db.session import get_engine, get_session_factory
 from redmine_rag.extraction.properties import EXTRACTOR_VERSION, extract_issue_properties
+from redmine_rag.services.llm_telemetry_service import (
+    get_llm_telemetry_snapshot,
+    reset_llm_telemetry,
+)
 
 
 @pytest.fixture
@@ -22,8 +26,10 @@ async def isolated_llm_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     monkeypatch.setenv("LLM_EXTRACT_MAX_RETRIES", "1")
     monkeypatch.setenv("LLM_EXTRACT_BATCH_SIZE", "10")
     monkeypatch.setenv("LLM_EXTRACT_COST_LIMIT_USD", "10")
+    monkeypatch.setenv("LLM_RUNTIME_COST_LIMIT_USD", "10")
     monkeypatch.setenv("LLM_EXTRACT_MAX_CONTEXT_CHARS", "4000")
 
+    reset_llm_telemetry()
     get_settings.cache_clear()
     get_engine.cache_clear()
     get_session_factory.cache_clear()
@@ -35,6 +41,7 @@ async def isolated_llm_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     yield
 
     await engine.dispose()
+    reset_llm_telemetry()
     get_settings.cache_clear()
     get_engine.cache_clear()
     get_session_factory.cache_clear()
@@ -212,3 +219,48 @@ async def test_extract_properties_blocks_prompt_injection_in_issue_context(
     assert llm["error_bucket"] == "prompt_injection"
     assert llm["attempts"] == 0
     assert row.confidence == 0.0
+
+
+@pytest.mark.asyncio
+async def test_extract_properties_skips_when_global_runtime_budget_exceeded(
+    isolated_llm_db: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LLM_RUNTIME_COST_LIMIT_USD", "0.000001")
+    get_settings.cache_clear()
+    reset_llm_telemetry()
+    await _seed_issue(issue_id=704)
+
+    response = await extract_issue_properties([704])
+    assert response.accepted is True
+    assert response.processed_issues == 1
+
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        row = await session.scalar(select(IssueProperty).where(IssueProperty.issue_id == 704))
+
+    assert row is not None
+    llm = row.props_json["llm"]
+    assert llm["status"] == "skipped"
+    assert llm["error_bucket"] == "cost_budget_exceeded"
+    telemetry = get_llm_telemetry_snapshot(budget_limit_usd=0.000001)
+    assert telemetry.skipped_calls == 1
+    assert telemetry.fallback_buckets.get("cost_budget_exceeded") == 1
+
+
+@pytest.mark.asyncio
+async def test_extract_properties_repeated_runs_under_load(isolated_llm_db: None) -> None:
+    await _seed_issue(issue_id=705)
+
+    for _ in range(8):
+        response = await extract_issue_properties([705])
+        assert response.accepted is True
+        assert response.processed_issues == 1
+
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        row = await session.scalar(select(IssueProperty).where(IssueProperty.issue_id == 705))
+
+    assert row is not None
+    llm = row.props_json["llm"]
+    assert llm["status"] == "ok"

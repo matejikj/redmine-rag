@@ -26,6 +26,15 @@ from redmine_rag.extraction.llm_structured import (
 )
 from redmine_rag.services.guardrail_service import detect_text_violation, record_guardrail_rejection
 from redmine_rag.services.llm_runtime import resolve_runtime_model
+from redmine_rag.services.llm_telemetry_service import (
+    allow_llm_execution,
+    configure_llm_runtime_controls,
+    estimate_cost_usd,
+    estimate_tokens,
+    record_llm_failure,
+    record_llm_fallback,
+    record_llm_success,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +84,14 @@ async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractRespon
         )
 
     settings = get_settings()
+    configure_llm_runtime_controls(
+        circuit_breaker_enabled=settings.llm_circuit_breaker_enabled,
+        circuit_failure_threshold=settings.llm_circuit_failure_threshold,
+        circuit_slow_threshold_ms=settings.llm_circuit_slow_threshold_ms,
+        circuit_slow_threshold_hits=settings.llm_circuit_slow_threshold_hits,
+        circuit_open_seconds=settings.llm_circuit_open_seconds,
+        telemetry_latency_window=settings.llm_telemetry_latency_window,
+    )
     session_factory = get_session_factory()
     extracted_at = datetime.now(UTC)
     llm_enabled = settings.llm_extract_enabled
@@ -124,9 +141,16 @@ async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractRespon
                         issue=issue,
                         max_chars=settings.llm_extract_max_context_chars,
                     )
+                    input_tokens_est = estimate_tokens(issue_context)
+                    output_tokens_est = 220
+                    estimated_cost_usd = estimate_cost_usd(
+                        input_tokens=input_tokens_est,
+                        output_tokens=output_tokens_est,
+                    )
                     context_violation = detect_text_violation(issue_context)
                     if context_violation is not None:
                         llm_failure_count += 1
+                        record_llm_fallback(llm_component="extract", reason=context_violation)
                         extraction.confidence = 0.0
                         extraction.extractor_version = _combined_extractor_version()
                         extraction.props_json["llm"] = {
@@ -137,7 +161,7 @@ async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractRespon
                             "attempts": 0,
                             "error_bucket": context_violation,
                             "latency_ms": 0,
-                            "estimated_cost_usd": 0.0,
+                            "estimated_cost_usd": estimated_cost_usd,
                             "last_error": "Issue context rejected by guardrail before LLM call",
                             "properties": None,
                         }
@@ -152,13 +176,16 @@ async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractRespon
                         extractions.append(extraction)
                         continue
 
-                    estimated_cost_usd = _estimate_extraction_cost_usd(issue_context)
                     if (
                         settings.llm_extract_cost_limit_usd > 0
                         and llm_estimated_cost_usd_total + estimated_cost_usd
                         > settings.llm_extract_cost_limit_usd
                     ):
                         llm_skipped_count += 1
+                        record_llm_fallback(
+                            llm_component="extract",
+                            reason="cost_limit_reached",
+                        )
                         extraction.confidence = 0.0
                         extraction.extractor_version = _combined_extractor_version()
                         extraction.props_json["llm"] = {
@@ -168,6 +195,31 @@ async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractRespon
                             "schema_version": SCHEMA_VERSION,
                             "attempts": 0,
                             "error_bucket": "cost_limit_reached",
+                            "latency_ms": 0,
+                            "estimated_cost_usd": estimated_cost_usd,
+                            "last_error": None,
+                            "properties": None,
+                        }
+                        extractions.append(extraction)
+                        continue
+
+                    allowed, blocked_reason = allow_llm_execution(
+                        estimated_cost_usd=estimated_cost_usd,
+                        budget_limit_usd=settings.llm_runtime_cost_limit_usd,
+                    )
+                    if not allowed:
+                        llm_skipped_count += 1
+                        skip_reason = blocked_reason or "circuit_open"
+                        record_llm_fallback(llm_component="extract", reason=skip_reason)
+                        extraction.confidence = 0.0
+                        extraction.extractor_version = _combined_extractor_version()
+                        extraction.props_json["llm"] = {
+                            "status": "skipped",
+                            "extractor_version": LLM_EXTRACTOR_VERSION,
+                            "prompt_version": PROMPT_VERSION,
+                            "schema_version": SCHEMA_VERSION,
+                            "attempts": 0,
+                            "error_bucket": skip_reason,
                             "latency_ms": 0,
                             "estimated_cost_usd": estimated_cost_usd,
                             "last_error": None,
@@ -189,6 +241,13 @@ async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractRespon
                     llm_retry_count += max(llm_result.attempts - 1, 0)
                     if llm_result.success:
                         llm_success_count += 1
+                        record_llm_success(
+                            llm_component="extract",
+                            latency_ms=llm_result.latency_ms,
+                            input_tokens=input_tokens_est,
+                            output_tokens=output_tokens_est,
+                            estimated_cost_usd=estimated_cost_usd,
+                        )
                         extraction.confidence = (
                             llm_result.properties.confidence
                             if llm_result.properties is not None
@@ -201,16 +260,23 @@ async def extract_issue_properties(issue_ids: list[int] | None) -> ExtractRespon
                         )
                     else:
                         llm_failure_count += 1
+                        error_bucket = llm_result.error_bucket or "provider_error"
+                        record_llm_failure(
+                            llm_component="extract",
+                            error_bucket=error_bucket,
+                            latency_ms=llm_result.latency_ms,
+                            input_tokens=input_tokens_est,
+                            output_tokens=output_tokens_est,
+                            estimated_cost_usd=estimated_cost_usd,
+                        )
+                        record_llm_fallback(llm_component="extract", reason=error_bucket)
                         extraction.confidence = 0.0
                         extraction.extractor_version = _combined_extractor_version()
                         extraction.props_json["llm"] = _llm_payload_from_result(
                             llm_result=llm_result,
                             estimated_cost_usd=estimated_cost_usd,
                         )
-                        if llm_result.error_bucket is not None:
-                            llm_error_buckets[llm_result.error_bucket] = (
-                                llm_error_buckets.get(llm_result.error_bucket, 0) + 1
-                            )
+                        llm_error_buckets[error_bucket] = llm_error_buckets.get(error_bucket, 0) + 1
                 else:
                     llm_skipped_count += 1
                     extraction.props_json["llm"] = {
@@ -637,9 +703,3 @@ def _build_issue_context(*, issue: Issue, max_chars: int) -> str:
     if len(context) <= max_chars:
         return context
     return context[:max_chars]
-
-
-def _estimate_extraction_cost_usd(context: str) -> float:
-    # Local deterministic estimate: approximately 750 chars ~ 1k tokens.
-    estimated_tokens = max(len(context) / 0.75, 1.0)
-    return round((estimated_tokens / 1000.0) * 0.0006, 6)

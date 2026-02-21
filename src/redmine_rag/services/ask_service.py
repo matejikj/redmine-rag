@@ -4,6 +4,7 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import orjson
@@ -20,6 +21,15 @@ from redmine_rag.services.guardrail_service import (
     record_guardrail_rejection,
 )
 from redmine_rag.services.llm_runtime import build_llm_runtime_client, resolve_runtime_model
+from redmine_rag.services.llm_telemetry_service import (
+    allow_llm_execution,
+    configure_llm_runtime_controls,
+    estimate_cost_usd,
+    estimate_tokens,
+    record_llm_failure,
+    record_llm_fallback,
+    record_llm_success,
+)
 from redmine_rag.services.retrieval_service import HybridRetrievalResult, hybrid_retrieve
 
 logger = logging.getLogger(__name__)
@@ -83,6 +93,7 @@ class LlmGroundedAnswer:
 class LlmSynthesisResult:
     answer: LlmGroundedAnswer | None
     rejection_reason: GuardrailReason | None
+    fallback_note: str | None = None
 
 
 class LlmClaimPayload(BaseModel):
@@ -211,7 +222,9 @@ async def answer_question(payload: AskRequest) -> AskResponse:
         else:
             synthesis_mode = "llm_fallback_deterministic"
             fallback_reason = llm_result.rejection_reason
-            if fallback_reason is not None:
+            if llm_result.fallback_note is not None:
+                limitations = llm_result.fallback_note
+            elif fallback_reason is not None:
                 limitations = guardrail_fallback_message(fallback_reason)
 
     logger.info(
@@ -281,6 +294,32 @@ def _guardrail_rejection_response(reason: GuardrailReason) -> AskResponse:
     )
 
 
+def _llm_runtime_fallback_message(reason: str) -> str:
+    if reason == "ask_cost_limit_reached":
+        return (
+            "LLM syntéza byla přeskočena, protože odhad nákladů pro tento dotaz překročil "
+            "`ASK_LLM_COST_LIMIT_USD`. Byla použita deterministická odpověď."
+        )
+    if reason == "cost_budget_exceeded":
+        return (
+            "LLM syntéza byla přeskočena, protože byl vyčerpán runtime rozpočet "
+            "`LLM_RUNTIME_COST_LIMIT_USD`. Byla použita deterministická odpověď."
+        )
+    if reason == "circuit_open":
+        return (
+            "LLM runtime je dočasně v ochranném režimu (circuit breaker). "
+            "Byla použita deterministická odpověď."
+        )
+    if reason == "timeout":
+        return "LLM runtime neodpověděl v časovém limitu. Byla použita deterministická odpověď."
+    if reason == "provider_error":
+        return (
+            "LLM provider je dočasně nedostupný nebo vrátil chybu. "
+            "Byla použita deterministická odpověď."
+        )
+    return "LLM syntéza nebyla dostupná. Byla použita deterministická odpověď."
+
+
 async def _synthesize_llm_grounded_answer(
     *,
     query: str,
@@ -289,75 +328,199 @@ async def _synthesize_llm_grounded_answer(
     timeout_s: float,
 ) -> LlmSynthesisResult:
     settings = get_settings()
+    configure_llm_runtime_controls(
+        circuit_breaker_enabled=settings.llm_circuit_breaker_enabled,
+        circuit_failure_threshold=settings.llm_circuit_failure_threshold,
+        circuit_slow_threshold_ms=settings.llm_circuit_slow_threshold_ms,
+        circuit_slow_threshold_hits=settings.llm_circuit_slow_threshold_hits,
+        circuit_open_seconds=settings.llm_circuit_open_seconds,
+        telemetry_latency_window=settings.llm_telemetry_latency_window,
+    )
     runtime_client = build_llm_runtime_client(provider=settings.llm_provider, settings=settings)
     model = resolve_runtime_model(settings)
     system_prompt = _load_ask_system_prompt()
     schema = _load_ask_schema()
     user_prompt = _build_ask_user_prompt(query=query, citations=citations, max_claims=max_claims)
-
-    try:
-        raw_response = await runtime_client.generate(
-            model=model,
-            prompt=user_prompt,
-            system_prompt=system_prompt,
-            timeout_s=timeout_s,
-            response_schema=schema,
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "Ask LLM synthesis failed; falling back to deterministic renderer",
-            extra={"error": str(exc), "provider": settings.llm_provider},
-        )
-        return LlmSynthesisResult(answer=None, rejection_reason=None)
-
-    payload = _parse_ask_llm_payload(raw_response)
-    if payload is None:
-        record_guardrail_rejection(
-            "schema_violation",
-            context="ask.llm_payload",
-            detail="Invalid ask response payload",
-        )
-        return LlmSynthesisResult(answer=None, rejection_reason="schema_violation")
-    if payload.insufficient_evidence:
+    llm_prompt_material = "\n".join([system_prompt, user_prompt])
+    input_tokens_est = estimate_tokens(llm_prompt_material)
+    output_tokens_est = max(80, max_claims * 120)
+    estimated_cost = estimate_cost_usd(
+        input_tokens=input_tokens_est,
+        output_tokens=output_tokens_est,
+    )
+    if settings.ask_llm_cost_limit_usd > 0 and estimated_cost > settings.ask_llm_cost_limit_usd:
+        record_llm_fallback(llm_component="ask", reason="ask_cost_limit_reached")
         return LlmSynthesisResult(
-            answer=LlmGroundedAnswer(claims=[], limitations=payload.limitations),
+            answer=None,
+            rejection_reason=None,
+            fallback_note=_llm_runtime_fallback_message("ask_cost_limit_reached"),
+        )
+
+    allowed, blocked_reason = allow_llm_execution(
+        estimated_cost_usd=estimated_cost,
+        budget_limit_usd=settings.llm_runtime_cost_limit_usd,
+    )
+    if not allowed:
+        reason = blocked_reason or "circuit_open"
+        record_llm_fallback(llm_component="ask", reason=reason)
+        return LlmSynthesisResult(
+            answer=None,
+            rejection_reason=None,
+            fallback_note=_llm_runtime_fallback_message(reason),
+        )
+
+    attempts_total = max(settings.ask_llm_max_retries, 0) + 1
+    final_error_bucket: str | None = None
+    for attempt in range(1, attempts_total + 1):
+        started = perf_counter()
+        try:
+            raw_response = await runtime_client.generate(
+                model=model,
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                timeout_s=timeout_s,
+                response_schema=schema,
+            )
+        except TimeoutError as exc:
+            latency_ms = int((perf_counter() - started) * 1000)
+            final_error_bucket = "timeout"
+            record_llm_failure(
+                llm_component="ask",
+                error_bucket=final_error_bucket,
+                latency_ms=latency_ms,
+                input_tokens=input_tokens_est,
+                output_tokens=0,
+                estimated_cost_usd=estimated_cost,
+            )
+            logger.warning(
+                "Ask LLM synthesis timed out; retrying deterministic fallback path",
+                extra={
+                    "error": str(exc),
+                    "provider": settings.llm_provider,
+                    "llm_attempt": attempt,
+                    "llm_attempts_total": attempts_total,
+                },
+            )
+            continue
+        except Exception as exc:  # noqa: BLE001
+            latency_ms = int((perf_counter() - started) * 1000)
+            final_error_bucket = "provider_error"
+            record_llm_failure(
+                llm_component="ask",
+                error_bucket=final_error_bucket,
+                latency_ms=latency_ms,
+                input_tokens=input_tokens_est,
+                output_tokens=0,
+                estimated_cost_usd=estimated_cost,
+            )
+            logger.warning(
+                "Ask LLM synthesis failed; retrying deterministic fallback path",
+                extra={
+                    "error": str(exc),
+                    "provider": settings.llm_provider,
+                    "llm_attempt": attempt,
+                    "llm_attempts_total": attempts_total,
+                },
+            )
+            continue
+
+        latency_ms = int((perf_counter() - started) * 1000)
+        payload, parse_error_bucket = _parse_ask_llm_payload(raw_response)
+        if payload is None:
+            final_error_bucket = parse_error_bucket or "schema_violation"
+            record_guardrail_rejection(
+                "schema_violation",
+                context="ask.llm_payload",
+                detail="Invalid ask response payload",
+            )
+            record_llm_failure(
+                llm_component="ask",
+                error_bucket=final_error_bucket,
+                latency_ms=latency_ms,
+                input_tokens=input_tokens_est,
+                output_tokens=estimate_tokens(raw_response),
+                estimated_cost_usd=estimated_cost,
+            )
+            continue
+
+        if payload.insufficient_evidence:
+            record_llm_success(
+                llm_component="ask",
+                latency_ms=latency_ms,
+                input_tokens=input_tokens_est,
+                output_tokens=estimate_tokens(raw_response),
+                estimated_cost_usd=estimated_cost,
+            )
+            return LlmSynthesisResult(
+                answer=LlmGroundedAnswer(claims=[], limitations=payload.limitations),
+                rejection_reason=None,
+            )
+
+        draft_claims = [
+            GroundedClaim(text=claim.text, citation_ids=claim.citation_ids)
+            for claim in payload.claims[:max_claims]
+        ]
+        validated_claims = _validate_claims(draft_claims, citations, source="llm")
+        if not validated_claims:
+            final_error_bucket = "ungrounded_claim"
+            record_guardrail_rejection(
+                "ungrounded_claim",
+                context="ask.llm_payload",
+                detail="No grounded LLM claims remained after validation",
+            )
+            record_llm_failure(
+                llm_component="ask",
+                error_bucket=final_error_bucket,
+                latency_ms=latency_ms,
+                input_tokens=input_tokens_est,
+                output_tokens=estimate_tokens(raw_response),
+                estimated_cost_usd=estimated_cost,
+            )
+            return LlmSynthesisResult(answer=None, rejection_reason="ungrounded_claim")
+
+        limitations = payload.limitations
+        if limitations is not None:
+            limitation_violation = detect_text_violation(limitations)
+            if limitation_violation is not None:
+                record_guardrail_rejection(
+                    limitation_violation,
+                    context="ask.llm_limitations",
+                    detail=limitations[:180],
+                )
+                limitations = guardrail_fallback_message(limitation_violation)
+
+        record_llm_success(
+            llm_component="ask",
+            latency_ms=latency_ms,
+            input_tokens=input_tokens_est,
+            output_tokens=estimate_tokens(raw_response),
+            estimated_cost_usd=estimated_cost,
+        )
+        return LlmSynthesisResult(
+            answer=LlmGroundedAnswer(claims=validated_claims, limitations=limitations),
             rejection_reason=None,
         )
 
-    draft_claims = [
-        GroundedClaim(text=claim.text, citation_ids=claim.citation_ids)
-        for claim in payload.claims[:max_claims]
-    ]
-    validated_claims = _validate_claims(draft_claims, citations, source="llm")
-    if not validated_claims:
-        record_guardrail_rejection(
-            "ungrounded_claim",
-            context="ask.llm_payload",
-            detail="No grounded LLM claims remained after validation",
+    if final_error_bucket in {"invalid_json", "schema_violation"}:
+        record_llm_fallback(
+            llm_component="ask",
+            reason=final_error_bucket,
         )
-        return LlmSynthesisResult(answer=None, rejection_reason="ungrounded_claim")
+        return LlmSynthesisResult(answer=None, rejection_reason="schema_violation")
 
-    limitations = payload.limitations
-    if limitations is not None:
-        limitation_violation = detect_text_violation(limitations)
-        if limitation_violation is not None:
-            record_guardrail_rejection(
-                limitation_violation,
-                context="ask.llm_limitations",
-                detail=limitations[:180],
-            )
-            limitations = guardrail_fallback_message(limitation_violation)
-
+    reason = final_error_bucket or "provider_error"
+    record_llm_fallback(llm_component="ask", reason=reason)
     return LlmSynthesisResult(
-        answer=LlmGroundedAnswer(claims=validated_claims, limitations=limitations),
+        answer=None,
         rejection_reason=None,
+        fallback_note=_llm_runtime_fallback_message(reason),
     )
 
 
-def _parse_ask_llm_payload(raw_response: str) -> LlmAnswerPayload | None:
+def _parse_ask_llm_payload(raw_response: str) -> tuple[LlmAnswerPayload | None, str | None]:
     payload = raw_response.strip()
     if not payload:
-        return None
+        return None, "schema_violation"
     if payload.startswith("```"):
         payload = payload.strip("`").strip()
         if payload.lower().startswith("json"):
@@ -368,17 +531,17 @@ def _parse_ask_llm_payload(raw_response: str) -> LlmAnswerPayload | None:
         start = payload.find("{")
         end = payload.rfind("}")
         if start < 0 or end < 0 or end <= start:
-            return None
+            return None, "invalid_json"
         try:
             parsed = orjson.loads(payload[start : end + 1])
         except orjson.JSONDecodeError:
-            return None
+            return None, "invalid_json"
     if not isinstance(parsed, dict):
-        return None
+        return None, "schema_violation"
     try:
-        return LlmAnswerPayload.model_validate(parsed)
+        return LlmAnswerPayload.model_validate(parsed), None
     except ValidationError:
-        return None
+        return None, "schema_violation"
 
 
 def _build_grounded_claims(

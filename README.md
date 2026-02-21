@@ -94,6 +94,11 @@ make mock-redmine
 - includes LLM guardrails and output validation:
   - rejection buckets: `prompt_injection`, `ungrounded_claim`, `schema_violation`, `unsafe_content`
   - rejected generations use safe fallback templates and are tracked in health diagnostics
+- includes LLM runtime control for reliability:
+  - per-request budget limit `ASK_LLM_COST_LIMIT_USD`
+  - global runtime budget `LLM_RUNTIME_COST_LIMIT_USD`
+  - retry budget `ASK_LLM_MAX_RETRIES`
+  - circuit-breaker control via `LLM_CIRCUIT_*` keys
 
 Deterministic extraction:
 - `POST /v1/extract/properties` computes `issue_metric` + `issue_property` with extractor version `det-v1`.
@@ -122,6 +127,10 @@ LLM structured extraction (JSON Schema):
 - Retry behavior:
   - invalid JSON and schema violations are retried up to `LLM_EXTRACT_MAX_RETRIES`
   - failed issues are bucketed (`invalid_json`, `schema_validation`, `timeout`, `provider_error`)
+- Runtime fallback behavior:
+  - extraction respects per-run budget `LLM_EXTRACT_COST_LIMIT_USD`
+  - extraction and ask both respect global budget `LLM_RUNTIME_COST_LIMIT_USD`
+  - circuit-breaker fallback is applied when repeated failures/slow calls are detected
 - Version strategy:
   - deterministic-only rows keep `extractor_version=det-v1`
   - deterministic + LLM rows store `extractor_version=det-v1+llm-json-v1`
@@ -135,6 +144,16 @@ export LLM_EXTRACT_ENABLED=true
 export OLLAMA_BASE_URL=http://127.0.0.1:11434
 export OLLAMA_MODEL=Mistral-7B-Instruct-v0.3-Q4_K_M
 export ASK_ANSWER_MODE=llm_grounded
+export ASK_LLM_MAX_RETRIES=1
+export ASK_LLM_COST_LIMIT_USD=0.05
+export LLM_RUNTIME_COST_LIMIT_USD=10.0
+export LLM_CIRCUIT_BREAKER_ENABLED=true
+export LLM_CIRCUIT_FAILURE_THRESHOLD=3
+export LLM_CIRCUIT_SLOW_THRESHOLD_MS=15000
+export LLM_CIRCUIT_SLOW_THRESHOLD_HITS=3
+export LLM_CIRCUIT_OPEN_SECONDS=60
+export LLM_SLO_MIN_SUCCESS_RATE=0.9
+export LLM_SLO_P95_LATENCY_MS=12000
 export RETRIEVAL_PLANNER_ENABLED=true
 export RETRIEVAL_PLANNER_MAX_EXPANSIONS=3
 export RETRIEVAL_PLANNER_TIMEOUT_S=12

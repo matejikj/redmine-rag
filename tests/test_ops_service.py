@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -14,6 +15,11 @@ from redmine_rag.services.guardrail_service import (
     reset_guardrail_rejection_counters,
 )
 from redmine_rag.services.llm_runtime import LlmRuntimeProbe
+from redmine_rag.services.llm_telemetry_service import (
+    configure_llm_runtime_controls,
+    record_llm_failure,
+    reset_llm_telemetry,
+)
 from redmine_rag.services.ops_service import (
     create_state_backup,
     get_health_status,
@@ -61,6 +67,7 @@ async def isolated_health_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
     monkeypatch.setenv("OLLAMA_MODEL", "Mistral-7B-Instruct-v0.3-Q4_K_M")
 
+    reset_llm_telemetry()
     get_settings.cache_clear()
     get_engine.cache_clear()
     get_session_factory.cache_clear()
@@ -72,6 +79,7 @@ async def isolated_health_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     yield
 
     await engine.dispose()
+    reset_llm_telemetry()
     get_settings.cache_clear()
     get_engine.cache_clear()
     get_session_factory.cache_clear()
@@ -155,3 +163,34 @@ async def test_health_exposes_guardrail_rejection_counters(
     assert "prompt_injection=1" in (guardrail_check.detail or "")
     assert "schema_violation=1" in (guardrail_check.detail or "")
     reset_guardrail_rejection_counters()
+
+
+@pytest.mark.asyncio
+async def test_health_exposes_llm_telemetry_circuit_state(
+    isolated_health_env: None,
+) -> None:
+    configure_llm_runtime_controls(
+        circuit_breaker_enabled=True,
+        circuit_failure_threshold=1,
+        circuit_slow_threshold_ms=10000,
+        circuit_slow_threshold_hits=2,
+        circuit_open_seconds=30.0,
+        telemetry_latency_window=50,
+    )
+    record_llm_failure(
+        llm_component="ask",
+        error_bucket="timeout",
+        latency_ms=25,
+        input_tokens=100,
+        output_tokens=0,
+        estimated_cost_usd=0.001,
+    )
+
+    response = await get_health_status()
+    telemetry_check = next(check for check in response.checks if check.name == "llm_telemetry")
+
+    assert telemetry_check.status == "warn"
+    detail = json.loads(telemetry_check.detail or "{}")
+    assert detail["attempted_calls"] == 1
+    assert detail["failed_calls"] == 1
+    assert detail["circuit"]["state"] == "open"

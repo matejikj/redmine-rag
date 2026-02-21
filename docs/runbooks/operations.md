@@ -11,6 +11,11 @@ This runbook covers production hardening tasks for sync health, incident respons
   - sync job counters (`queued`, `running`, `finished`, `failed`)
   - config/security checks (`outbound_policy`, `secrets`)
   - LLM runtime check (`llm_runtime`) including Ollama reachability/model readiness
+  - LLM telemetry check (`llm_telemetry`) with:
+    - attempted/success/failed/skipped counters
+    - latency stats (`avg_latency_ms`, `p95_latency_ms`)
+    - estimated token/cost usage and remaining budget
+    - circuit-breaker state/reason
   - guardrail counters (`guardrails`) across buckets:
     - `prompt_injection`
     - `ungrounded_claim`
@@ -84,10 +89,31 @@ Runs:
   - verify Ollama server is running and reachable
   - verify `OLLAMA_MODEL` exists in `ollama list`
   - re-run extraction after runtime recovery
+- degraded `llm_telemetry`:
+  - inspect `llm_telemetry.detail` JSON from `/healthz`
+  - if `circuit.state=open`, identify bucket in `circuit.reason` and stabilize runtime first
+  - if budget exhausted, increase `LLM_RUNTIME_COST_LIMIT_USD` or reduce LLM load
+  - if p95 latency is high, reduce concurrency, shrink context, or raise `OLLAMA_TIMEOUT_S`
 - non-zero `guardrails` counters:
   - inspect logs for `guardrail_reason` and `guardrail_context`
   - confirm blocked content is expected (red-team test) or malicious input attempt
   - if false positives grow, tune guardrail patterns and rerun regression tests
+
+## LLM SLO / Alert Targets
+
+- Reliability SLO:
+  - success rate >= `LLM_SLO_MIN_SUCCESS_RATE` (default `0.90`) once sample size >= 5 calls
+- Latency SLO:
+  - p95 latency <= `LLM_SLO_P95_LATENCY_MS` (default `12000`)
+- Budget guard:
+  - alert if `budget_remaining_usd` from `llm_telemetry` is `0`
+- Circuit-breaker:
+  - alert immediately when `circuit.state` switches to `open`
+
+Suggested alert thresholds:
+- warning: success rate < 0.9 for 10+ calls in 15 minutes
+- warning: p95 latency > 12s for 10+ calls in 15 minutes
+- critical: circuit open for > 5 minutes or budget exhausted
 
 ## Soak Test (Medium Dataset)
 

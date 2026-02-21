@@ -131,6 +131,39 @@ def _load_report_metrics(path: Path) -> dict[str, Any]:
     return metrics
 
 
+def _fetch_llm_runtime_metrics(*, api_base_url: str, timeout_s: float) -> dict[str, Any] | None:
+    url = f"{api_base_url.rstrip('/')}/healthz"
+    with httpx.Client(timeout=timeout_s) as client:
+        response = client.get(url)
+    if response.status_code != 200:
+        return None
+    payload = response.json()
+    checks = payload.get("checks", [])
+    if not isinstance(checks, list):
+        return None
+
+    for check in checks:
+        if not isinstance(check, dict):
+            continue
+        if check.get("name") != "llm_telemetry":
+            continue
+        detail_raw = check.get("detail")
+        detail: dict[str, Any] = {}
+        if isinstance(detail_raw, str) and detail_raw.strip():
+            try:
+                parsed = json.loads(detail_raw)
+            except json.JSONDecodeError:
+                parsed = {"raw_detail": detail_raw}
+            if isinstance(parsed, dict):
+                detail = parsed
+        if not isinstance(detail, dict):
+            detail = {}
+        detail["health_status"] = str(check.get("status", "unknown"))
+        detail["health_latency_ms"] = check.get("latency_ms")
+        return detail
+    return None
+
+
 def _evaluate_thresholds(
     *,
     metrics: dict[str, Any],
@@ -205,6 +238,7 @@ def main() -> None:
     print(f"Expected source-type coverage: {dataset_summary['expected_source_type_coverage']}")
 
     results_rows: list[dict[str, Any]] | None = None
+    llm_runtime_metrics: dict[str, Any] | None = None
     if args.results:
         results_rows = load_jsonl_rows(Path(args.results))
         print(f"Loaded {len(results_rows)} evaluation rows from {args.results}")
@@ -218,6 +252,10 @@ def main() -> None:
             output_results=output_results,
         )
         print(f"Generated {len(results_rows)} evaluation rows to {output_results}")
+        llm_runtime_metrics = _fetch_llm_runtime_metrics(
+            api_base_url=args.api_base_url,
+            timeout_s=args.timeout_s,
+        )
 
     if results_rows is None:
         print(
@@ -253,6 +291,7 @@ def main() -> None:
         "results_path": args.results or str(Path(args.output_results)),
         "top_k": args.top_k,
         "metrics": metrics.to_dict(),
+        "llm_runtime": llm_runtime_metrics,
         "dataset_summary": dataset_summary,
         "query_diagnostics": [item.to_dict() for item in query_diagnostics],
     }

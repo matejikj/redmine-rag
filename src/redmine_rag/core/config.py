@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     ask_answer_mode: str = "deterministic"
     ask_llm_timeout_s: float = 20.0
     ask_llm_max_claims: int = 5
+    ask_llm_max_retries: int = 1
+    ask_llm_cost_limit_usd: float = 0.05
 
     redmine_base_url: str = "https://redmine.example.com"
     redmine_api_key: str = "replace_me"
@@ -77,6 +79,15 @@ class Settings(BaseSettings):
     llm_extract_max_context_chars: int = 6000
     llm_extract_timeout_s: float = 20.0
     llm_extract_cost_limit_usd: float = 1.0
+    llm_runtime_cost_limit_usd: float = 10.0
+    llm_circuit_breaker_enabled: bool = True
+    llm_circuit_failure_threshold: int = 3
+    llm_circuit_slow_threshold_ms: int = 15000
+    llm_circuit_slow_threshold_hits: int = 3
+    llm_circuit_open_seconds: float = 60.0
+    llm_telemetry_latency_window: int = 200
+    llm_slo_min_success_rate: float = 0.9
+    llm_slo_p95_latency_ms: int = 12000
 
     @field_validator("app_env")
     @classmethod
@@ -144,11 +155,17 @@ class Settings(BaseSettings):
         "retrieval_candidate_multiplier",
         "retrieval_planner_max_expansions",
         "ask_llm_max_claims",
+        "ask_llm_max_retries",
         "llm_extract_max_retries",
         "llm_extract_batch_size",
         "llm_extract_max_context_chars",
         "sync_job_history_limit",
         "ollama_max_concurrency",
+        "llm_circuit_failure_threshold",
+        "llm_circuit_slow_threshold_ms",
+        "llm_circuit_slow_threshold_hits",
+        "llm_telemetry_latency_window",
+        "llm_slo_p95_latency_ms",
     )
     @classmethod
     def validate_positive_ints(cls, value: int) -> int:
@@ -166,6 +183,9 @@ class Settings(BaseSettings):
     @field_validator(
         "llm_extract_timeout_s",
         "llm_extract_cost_limit_usd",
+        "ask_llm_cost_limit_usd",
+        "llm_runtime_cost_limit_usd",
+        "llm_circuit_open_seconds",
         "redmine_http_timeout_s",
         "ollama_timeout_s",
         "ask_llm_timeout_s",
@@ -175,6 +195,13 @@ class Settings(BaseSettings):
     def validate_non_negative_floats(cls, value: float) -> float:
         if value < 0:
             raise ValueError("Value must be >= 0")
+        return value
+
+    @field_validator("llm_slo_min_success_rate")
+    @classmethod
+    def validate_rate_between_zero_and_one(cls, value: float) -> float:
+        if value < 0 or value > 1:
+            raise ValueError("Value must be between 0 and 1")
         return value
 
     @field_validator("ask_answer_mode")

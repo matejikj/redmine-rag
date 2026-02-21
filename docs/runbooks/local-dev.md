@@ -94,6 +94,16 @@ export OLLAMA_MODEL=Mistral-7B-Instruct-v0.3-Q4_K_M
 export OLLAMA_TIMEOUT_S=45
 export OLLAMA_MAX_CONCURRENCY=2
 export ASK_ANSWER_MODE=llm_grounded
+export ASK_LLM_MAX_RETRIES=1
+export ASK_LLM_COST_LIMIT_USD=0.05
+export LLM_RUNTIME_COST_LIMIT_USD=10.0
+export LLM_CIRCUIT_BREAKER_ENABLED=true
+export LLM_CIRCUIT_FAILURE_THRESHOLD=3
+export LLM_CIRCUIT_SLOW_THRESHOLD_MS=15000
+export LLM_CIRCUIT_SLOW_THRESHOLD_HITS=3
+export LLM_CIRCUIT_OPEN_SECONDS=60
+export LLM_SLO_MIN_SUCCESS_RATE=0.9
+export LLM_SLO_P95_LATENCY_MS=12000
 export RETRIEVAL_PLANNER_ENABLED=true
 export RETRIEVAL_PLANNER_MAX_EXPANSIONS=3
 export RETRIEVAL_PLANNER_TIMEOUT_S=12
@@ -118,6 +128,7 @@ Planner notes:
 - planner-suggested IDs are applied only if they exist in local DB domain tables.
 - if planner fails or returns invalid payload, retrieval falls back to original user query.
 - guardrail rejections are tracked by buckets in `/healthz` under `guardrails`.
+- LLM runtime telemetry is available in `/healthz` under `llm_telemetry` (JSON payload in `detail`).
 
 Or via API:
 
@@ -131,6 +142,8 @@ Notes on extraction limits:
 - `LLM_EXTRACT_TIMEOUT_S` bounds per-issue latency budget.
 - `LLM_EXTRACT_COST_LIMIT_USD` limits total estimated extraction spend per run.
 - `LLM_EXTRACT_MAX_CONTEXT_CHARS` caps issue context size to keep prompts bounded.
+- `LLM_RUNTIME_COST_LIMIT_USD` applies a global runtime budget across ask/extract LLM calls.
+- circuit-breaker fallback can temporarily force deterministic mode when repeated failures/slow calls occur.
 
 ## Query workflow metrics summary
 
@@ -148,6 +161,17 @@ For live eval run against local API:
 
 ```bash
 python3 scripts/eval/run_eval.py --api-base-url http://127.0.0.1:8000 --output-results evals/results.latest.jsonl
+```
+
+With LLM reliability/latency gate:
+
+```bash
+python3 scripts/eval/check_regression_gate.py \
+  --current evals/reports/latest_eval_report.json \
+  --baseline evals/baseline_metrics.v1.json \
+  --max-llm-error-rate 0.15 \
+  --max-llm-p95-latency-ms 20000 \
+  --require-llm-circuit-closed
 ```
 
 ## Ops commands

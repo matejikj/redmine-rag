@@ -12,6 +12,10 @@ from redmine_rag.db.base import Base
 from redmine_rag.db.session import get_engine, get_session_factory
 from redmine_rag.main import app
 from redmine_rag.services import ask_service
+from redmine_rag.services.llm_telemetry_service import (
+    get_llm_telemetry_snapshot,
+    reset_llm_telemetry,
+)
 from redmine_rag.services.retrieval_service import (
     HybridRetrievalResult,
     RetrievalDiagnostics,
@@ -55,6 +59,13 @@ async def isolated_ask_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     get_settings.cache_clear()
     get_engine.cache_clear()
     get_session_factory.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_llm_runtime_telemetry() -> None:
+    reset_llm_telemetry()
+    yield
+    reset_llm_telemetry()
 
 
 def test_ask_returns_grounded_fallback_when_no_data(isolated_ask_env: None) -> None:
@@ -240,9 +251,18 @@ def test_ask_llm_grounded_uses_validated_claims(monkeypatch: pytest.MonkeyPatch)
             ask_answer_mode="llm_grounded",
             ask_llm_timeout_s=20.0,
             ask_llm_max_claims=5,
+            ask_llm_max_retries=1,
+            ask_llm_cost_limit_usd=1.0,
             llm_provider="ollama",
             llm_model="unused",
             ollama_model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+            llm_runtime_cost_limit_usd=10.0,
+            llm_circuit_breaker_enabled=True,
+            llm_circuit_failure_threshold=3,
+            llm_circuit_slow_threshold_ms=15000,
+            llm_circuit_slow_threshold_hits=3,
+            llm_circuit_open_seconds=30.0,
+            llm_telemetry_latency_window=100,
         ),
     )
     monkeypatch.setattr(
@@ -314,9 +334,18 @@ def test_ask_llm_grounded_prompt_injection_not_bypassing_grounding(
             ask_answer_mode="llm_grounded",
             ask_llm_timeout_s=20.0,
             ask_llm_max_claims=5,
+            ask_llm_max_retries=1,
+            ask_llm_cost_limit_usd=1.0,
             llm_provider="ollama",
             llm_model="unused",
             ollama_model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+            llm_runtime_cost_limit_usd=10.0,
+            llm_circuit_breaker_enabled=True,
+            llm_circuit_failure_threshold=3,
+            llm_circuit_slow_threshold_ms=15000,
+            llm_circuit_slow_threshold_hits=3,
+            llm_circuit_open_seconds=30.0,
+            llm_telemetry_latency_window=100,
         ),
     )
     monkeypatch.setattr(
@@ -344,6 +373,331 @@ def test_ask_llm_grounded_prompt_injection_not_bypassing_grounding(
     assert "Nemám dostatek důkazů" not in payload["answer_markdown"]
     assert payload["citations"]
     assert payload["used_chunk_ids"] == [601]
+
+
+def test_ask_llm_grounded_falls_back_on_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _fake_hybrid_retrieve(*_args, **_kwargs) -> HybridRetrievalResult:
+        return _mock_result(
+            [
+                RetrievedChunk(
+                    id=701,
+                    text="Runbook documents rollback steps for auth incidents.",
+                    url="http://x/wiki/Incident-Triage-Playbook",
+                    source_type="wiki",
+                    source_id="1:Incident-Triage-Playbook",
+                    score=0.88,
+                )
+            ]
+        )
+
+    class _TimeoutRuntimeClient:
+        async def generate(
+            self,
+            *,
+            model: str,
+            prompt: str,
+            system_prompt: str | None,
+            timeout_s: float,
+            response_schema: dict[str, object] | None,
+        ) -> str:
+            del model, prompt, system_prompt, timeout_s, response_schema
+            raise TimeoutError("runtime timeout")
+
+    monkeypatch.setattr(ask_service, "hybrid_retrieve", _fake_hybrid_retrieve)
+    monkeypatch.setattr(
+        ask_service,
+        "get_settings",
+        lambda: SimpleNamespace(
+            ask_answer_mode="llm_grounded",
+            ask_llm_timeout_s=1.0,
+            ask_llm_max_claims=5,
+            ask_llm_max_retries=1,
+            ask_llm_cost_limit_usd=1.0,
+            llm_provider="ollama",
+            llm_model="unused",
+            ollama_model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+            llm_runtime_cost_limit_usd=10.0,
+            llm_circuit_breaker_enabled=True,
+            llm_circuit_failure_threshold=3,
+            llm_circuit_slow_threshold_ms=15000,
+            llm_circuit_slow_threshold_hits=3,
+            llm_circuit_open_seconds=30.0,
+            llm_telemetry_latency_window=100,
+        ),
+    )
+    monkeypatch.setattr(
+        ask_service,
+        "build_llm_runtime_client",
+        lambda *args, **kwargs: _TimeoutRuntimeClient(),
+    )
+    monkeypatch.setattr(
+        ask_service,
+        "resolve_runtime_model",
+        lambda _settings: "Mistral-7B-Instruct-v0.3-Q4_K_M",
+    )
+
+    client = TestClient(app)
+    response = client.post(
+        "/v1/ask",
+        json={
+            "query": "What is rollback runbook?",
+            "filters": {"project_ids": [1]},
+            "top_k": 5,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "LLM runtime neodpověděl v časovém limitu" in payload["answer_markdown"]
+    assert "Odpověď podložená Redmine zdroji (LLM)" not in payload["answer_markdown"]
+    telemetry = get_llm_telemetry_snapshot(budget_limit_usd=10.0)
+    assert telemetry.failed_calls == 2
+    assert telemetry.fallback_buckets.get("timeout") == 1
+
+
+def test_ask_llm_grounded_skips_when_request_budget_exceeded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _fake_hybrid_retrieve(*_args, **_kwargs) -> HybridRetrievalResult:
+        return _mock_result(
+            [
+                RetrievedChunk(
+                    id=801,
+                    text=(
+                        "OAuth callback timeout affects login flow. "
+                        "Rollback runbook includes communication checklist."
+                    ),
+                    url="http://x/issues/801",
+                    source_type="issue",
+                    source_id="801",
+                    score=0.9,
+                )
+            ]
+        )
+
+    class _RuntimeShouldNotRun:
+        async def generate(
+            self,
+            *,
+            model: str,
+            prompt: str,
+            system_prompt: str | None,
+            timeout_s: float,
+            response_schema: dict[str, object] | None,
+        ) -> str:
+            del model, prompt, system_prompt, timeout_s, response_schema
+            raise AssertionError("LLM runtime should not be called when request budget is exceeded")
+
+    monkeypatch.setattr(ask_service, "hybrid_retrieve", _fake_hybrid_retrieve)
+    monkeypatch.setattr(
+        ask_service,
+        "get_settings",
+        lambda: SimpleNamespace(
+            ask_answer_mode="llm_grounded",
+            ask_llm_timeout_s=5.0,
+            ask_llm_max_claims=5,
+            ask_llm_max_retries=1,
+            ask_llm_cost_limit_usd=0.000001,
+            llm_provider="ollama",
+            llm_model="unused",
+            ollama_model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+            llm_runtime_cost_limit_usd=10.0,
+            llm_circuit_breaker_enabled=True,
+            llm_circuit_failure_threshold=3,
+            llm_circuit_slow_threshold_ms=15000,
+            llm_circuit_slow_threshold_hits=3,
+            llm_circuit_open_seconds=30.0,
+            llm_telemetry_latency_window=100,
+        ),
+    )
+    monkeypatch.setattr(
+        ask_service,
+        "build_llm_runtime_client",
+        lambda *args, **kwargs: _RuntimeShouldNotRun(),
+    )
+    monkeypatch.setattr(
+        ask_service,
+        "resolve_runtime_model",
+        lambda _settings: "Mistral-7B-Instruct-v0.3-Q4_K_M",
+    )
+
+    client = TestClient(app)
+    response = client.post(
+        "/v1/ask",
+        json={
+            "query": "Summarize callback issue and rollback plan.",
+            "filters": {"project_ids": [1]},
+            "top_k": 5,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "ASK_LLM_COST_LIMIT_USD" in payload["answer_markdown"]
+    telemetry = get_llm_telemetry_snapshot(budget_limit_usd=10.0)
+    assert telemetry.skipped_calls == 1
+    assert telemetry.fallback_buckets.get("ask_cost_limit_reached") == 1
+
+
+def test_ask_llm_grounded_falls_back_on_invalid_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _fake_hybrid_retrieve(*_args, **_kwargs) -> HybridRetrievalResult:
+        return _mock_result(
+            [
+                RetrievedChunk(
+                    id=901,
+                    text="Auth incident runbook mentions rollback plan.",
+                    url="http://x/wiki/Incident-Triage-Playbook",
+                    source_type="wiki",
+                    source_id="1:Incident-Triage-Playbook",
+                    score=0.86,
+                )
+            ]
+        )
+
+    class _InvalidPayloadRuntimeClient:
+        async def generate(
+            self,
+            *,
+            model: str,
+            prompt: str,
+            system_prompt: str | None,
+            timeout_s: float,
+            response_schema: dict[str, object] | None,
+        ) -> str:
+            del model, prompt, system_prompt, timeout_s, response_schema
+            return "this is not json"
+
+    monkeypatch.setattr(ask_service, "hybrid_retrieve", _fake_hybrid_retrieve)
+    monkeypatch.setattr(
+        ask_service,
+        "get_settings",
+        lambda: SimpleNamespace(
+            ask_answer_mode="llm_grounded",
+            ask_llm_timeout_s=5.0,
+            ask_llm_max_claims=5,
+            ask_llm_max_retries=1,
+            ask_llm_cost_limit_usd=1.0,
+            llm_provider="ollama",
+            llm_model="unused",
+            ollama_model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+            llm_runtime_cost_limit_usd=10.0,
+            llm_circuit_breaker_enabled=True,
+            llm_circuit_failure_threshold=3,
+            llm_circuit_slow_threshold_ms=15000,
+            llm_circuit_slow_threshold_hits=3,
+            llm_circuit_open_seconds=30.0,
+            llm_telemetry_latency_window=100,
+        ),
+    )
+    monkeypatch.setattr(
+        ask_service,
+        "build_llm_runtime_client",
+        lambda *args, **kwargs: _InvalidPayloadRuntimeClient(),
+    )
+    monkeypatch.setattr(
+        ask_service,
+        "resolve_runtime_model",
+        lambda _settings: "Mistral-7B-Instruct-v0.3-Q4_K_M",
+    )
+
+    client = TestClient(app)
+    response = client.post(
+        "/v1/ask",
+        json={
+            "query": "What is rollback guidance?",
+            "filters": {"project_ids": [1]},
+            "top_k": 5,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "LLM výstup nesplnil požadovaný strukturovaný kontrakt" in payload["answer_markdown"]
+    telemetry = get_llm_telemetry_snapshot(budget_limit_usd=10.0)
+    assert telemetry.failed_calls == 2
+    assert telemetry.fallback_buckets.get("invalid_json") == 1
+
+
+def test_ask_llm_grounded_repeated_calls_under_load(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _fake_hybrid_retrieve(*_args, **_kwargs) -> HybridRetrievalResult:
+        return _mock_result(
+            [
+                RetrievedChunk(
+                    id=950,
+                    text="Rollback runbook defines auth callback remediation.",
+                    url="http://x/wiki/Incident-Triage-Playbook",
+                    source_type="wiki",
+                    source_id="1:Incident-Triage-Playbook",
+                    score=0.9,
+                )
+            ]
+        )
+
+    class _FastRuntimeClient:
+        async def generate(
+            self,
+            *,
+            model: str,
+            prompt: str,
+            system_prompt: str | None,
+            timeout_s: float,
+            response_schema: dict[str, object] | None,
+        ) -> str:
+            del model, prompt, system_prompt, timeout_s, response_schema
+            return (
+                '{"claims":[{"text":"Rollback runbook defines auth callback remediation.",'
+                '"citation_ids":[1]}],"insufficient_evidence":false}'
+            )
+
+    monkeypatch.setattr(ask_service, "hybrid_retrieve", _fake_hybrid_retrieve)
+    monkeypatch.setattr(
+        ask_service,
+        "get_settings",
+        lambda: SimpleNamespace(
+            ask_answer_mode="llm_grounded",
+            ask_llm_timeout_s=5.0,
+            ask_llm_max_claims=5,
+            ask_llm_max_retries=1,
+            ask_llm_cost_limit_usd=1.0,
+            llm_provider="ollama",
+            llm_model="unused",
+            ollama_model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+            llm_runtime_cost_limit_usd=10.0,
+            llm_circuit_breaker_enabled=True,
+            llm_circuit_failure_threshold=3,
+            llm_circuit_slow_threshold_ms=15000,
+            llm_circuit_slow_threshold_hits=3,
+            llm_circuit_open_seconds=30.0,
+            llm_telemetry_latency_window=100,
+        ),
+    )
+    monkeypatch.setattr(
+        ask_service,
+        "build_llm_runtime_client",
+        lambda *args, **kwargs: _FastRuntimeClient(),
+    )
+    monkeypatch.setattr(
+        ask_service,
+        "resolve_runtime_model",
+        lambda _settings: "Mistral-7B-Instruct-v0.3-Q4_K_M",
+    )
+
+    client = TestClient(app)
+    for _ in range(10):
+        response = client.post(
+            "/v1/ask",
+            json={
+                "query": "What is rollback remediation?",
+                "filters": {"project_ids": [1]},
+                "top_k": 5,
+            },
+        )
+        assert response.status_code == 200
+
+    telemetry = get_llm_telemetry_snapshot(budget_limit_usd=10.0)
+    assert telemetry.attempted_calls == 10
+    assert telemetry.success_calls == 10
+    assert telemetry.p95_latency_ms is not None
 
 
 @pytest.mark.asyncio

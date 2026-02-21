@@ -6,7 +6,7 @@ import sqlite3
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 from sqlalchemy import func, select, text
@@ -18,6 +18,7 @@ from redmine_rag.db.models import SyncJob, SyncState
 from redmine_rag.db.session import get_session_factory
 from redmine_rag.services.guardrail_service import guardrail_rejection_counters
 from redmine_rag.services.llm_runtime import is_ollama_provider, probe_llm_runtime
+from redmine_rag.services.llm_telemetry_service import get_llm_telemetry_snapshot
 
 
 async def get_health_status() -> HealthResponse:
@@ -178,6 +179,32 @@ async def get_health_status() -> HealthResponse:
                 detail=f"LLM provider '{settings.llm_provider}' has no runtime integration",
             )
         )
+
+    llm_snapshot = get_llm_telemetry_snapshot(budget_limit_usd=settings.llm_runtime_cost_limit_usd)
+    llm_telemetry_status: Literal["ok", "warn", "fail"] = "ok"
+    if llm_snapshot.circuit.state == "open":
+        llm_telemetry_status = "warn"
+    elif (
+        llm_snapshot.attempted_calls >= 5
+        and llm_snapshot.success_rate < settings.llm_slo_min_success_rate
+    ):
+        llm_telemetry_status = "warn"
+    elif (
+        llm_snapshot.p95_latency_ms is not None
+        and llm_snapshot.p95_latency_ms > settings.llm_slo_p95_latency_ms
+    ):
+        llm_telemetry_status = "warn"
+    elif llm_snapshot.budget_remaining_usd is not None and llm_snapshot.budget_remaining_usd <= 0:
+        llm_telemetry_status = "warn"
+
+    checks.append(
+        HealthCheck(
+            name="llm_telemetry",
+            status=llm_telemetry_status,
+            detail=json.dumps(llm_snapshot.to_dict(), ensure_ascii=False),
+            latency_ms=llm_snapshot.p95_latency_ms,
+        )
+    )
 
     guardrail_counts = guardrail_rejection_counters()
     guardrail_total = sum(guardrail_counts.values())

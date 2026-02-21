@@ -91,3 +91,54 @@ test("routing and API connectivity smoke", async ({ page }) => {
   await expect(page.getByText("Job accepted:")).toBeVisible();
   await expect(page.getByText("job-new-sync")).toBeVisible();
 });
+
+test("ask workbench and citation explorer journey", async ({ page }) => {
+  await page.route("**/v1/ask", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        answer_markdown: [
+          "### Odpověď podložená Redmine zdroji (LLM)",
+          "1. OAuth callback timeout affects Safari login flow. [1, 2]",
+          "2. Rollback guidance is documented in incident playbook. [2]",
+          "",
+          "_Retrieval mode: hybrid; lexical=10, vector=7, fused=5_"
+        ].join("\\n"),
+        citations: [
+          {
+            id: 1,
+            url: "https://redmine.example.com/issues/501",
+            source_type: "issue",
+            source_id: "501",
+            snippet: "OAuth callback timeout impacts Safari users."
+          },
+          {
+            id: 2,
+            url: "https://redmine.example.com/wiki/Incident-Triage-Playbook",
+            source_type: "wiki",
+            source_id: "1:Incident-Triage-Playbook",
+            snippet: "Rollback checklist and communication steps."
+          }
+        ],
+        used_chunk_ids: [1001, 1002],
+        confidence: 0.82
+      })
+    });
+  });
+
+  await page.goto("/ask");
+  await expect(page.getByRole("heading", { name: "Ask Workbench and Citation Explorer" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Run query" }).click();
+  await expect(page.getByText("Claim-to-Citation Mapping")).toBeVisible();
+  await expect(page.getByRole("button", { name: "[1]" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Explain / debug" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Explain / debug" }).click();
+  await expect(page.getByText("Retrieval mode:")).toBeVisible();
+  await expect(page.getByText("hybrid")).toBeVisible();
+
+  await page.getByLabel("Source filter").selectOption("wiki");
+  await expect(page.getByText("1:Incident-Triage-Playbook")).toBeVisible();
+});

@@ -1,0 +1,83 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MarkdownSurface > renders claim lines with clickable citation markers 1`] = `
+<div
+  class="surface-card p-5"
+>
+  <h3
+    class="section-title mt-2 text-lg font-semibold"
+  >
+    Odpověď podložená Redmine zdroji
+  </h3>
+  <div
+    class="my-1 rounded-xl border px-3 py-2 text-sm leading-relaxed border-[var(--brand)] bg-[var(--brand-soft)]/40 text-[var(--ink-0)]"
+  >
+    <p>
+      <span
+        class="font-semibold"
+      >
+        1
+        .
+      </span>
+
+      OAuth callback timeout affects login flow.
+    </p>
+    <div
+      class="mt-1 flex flex-wrap items-center gap-1 text-xs"
+    >
+      <span
+        class="text-[var(--ink-2)]"
+      >
+        Citations:
+      </span>
+      <button
+        class="rounded-full border px-2 py-0.5 font-semibold border-[var(--border)] bg-white text-[var(--ink-1)]"
+        type="button"
+      >
+        [
+        1
+        ]
+      </button>
+      <button
+        class="rounded-full border px-2 py-0.5 font-semibold border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand-strong)]"
+        type="button"
+      >
+        [
+        2
+        ]
+      </button>
+    </div>
+  </div>
+  <div
+    class="my-1 rounded-xl border px-3 py-2 text-sm leading-relaxed border-[var(--border)] bg-[var(--surface-1)] text-[var(--ink-0)]"
+  >
+    <p>
+      <span
+        class="font-semibold"
+      >
+        2
+        .
+      </span>
+
+      Rollback steps are documented in runbook.
+    </p>
+    <div
+      class="mt-1 flex flex-wrap items-center gap-1 text-xs"
+    >
+      <span
+        class="text-[var(--ink-2)]"
+      >
+        Citations:
+      </span>
+      <button
+        class="rounded-full border px-2 py-0.5 font-semibold border-[var(--border)] bg-white text-[var(--ink-1)]"
+        type="button"
+      >
+        [
+        3
+        ]
+      </button>
+    </div>
+  </div>
+</div>
+`;

@@ -47,6 +47,12 @@ Task 17 sync control center is available under `Sync` page in the UI:
 - inspect per-job ingestion/indexing summary
 - retry failed jobs with preserved scope/modules
 
+Task 18 ask workbench is available under `Ask` page in the UI:
+- query workspace with project/tracker/status/date filters
+- claim-to-citation mapping with clickable citation markers
+- citation explorer drawer with source filter, search, and sort
+- explain/debug mode for retrieval and synthesis diagnostics
+
 ## Docker (optional)
 
 ```bash

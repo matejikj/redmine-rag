@@ -60,3 +60,13 @@ State components are used by pages as default behavior for all API calls.
 ## Component usage examples
 
 See `frontend/src/pages/DesignSystemPage.tsx` for canonical examples.
+
+## Ask Usability Prompts (Task 18)
+
+Use these realistic support questions during manual UX checks:
+
+1. `What is the login callback issue and rollback plan?`
+2. `Which issue documents incident triage for OAuth failures?`
+3. `What evidence points to root cause and mitigation steps?`
+4. `Summarize user impact and next actions for the latest auth incident.`
+5. `What changed between initial incident and final resolution?`

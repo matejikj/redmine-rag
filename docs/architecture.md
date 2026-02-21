@@ -7,6 +7,7 @@ Provide feature-level answers from full Redmine data (not only issues/wiki) with
 ## System components
 
 - `API` (`FastAPI`): query, sync trigger, extraction trigger.
+- `Ops API` (`FastAPI`): health diagnostics and sync job introspection.
 - `Storage` (`SQLite + FTS5`): generic raw payloads (`raw_entity`), normalized entities, chunk store.
 - `Vector layer` (`LocalNumpyVectorStore`): pluggable local similarity index.
 - `Ingestion` (`RedmineClient` + sync pipeline): incremental fetch and normalization.
@@ -36,6 +37,7 @@ Provide feature-level answers from full Redmine data (not only issues/wiki) with
 4. FTS triggers update lexical index automatically.
 5. Vector index updates out-of-band through indexing jobs.
 6. `POST /v1/ask` retrieves chunks and returns grounded response + citations.
+7. `GET /v1/sync/jobs` and `GET /healthz` expose operational state for automation.
 
 ## Non-functional priorities
 

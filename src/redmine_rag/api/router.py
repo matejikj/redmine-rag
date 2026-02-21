@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 
-from fastapi import APIRouter, BackgroundTasks, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
-from redmine_rag import __version__
 from redmine_rag.api.schemas import (
     AskRequest,
     AskResponse,
@@ -12,27 +11,23 @@ from redmine_rag.api.schemas import (
     ExtractResponse,
     HealthResponse,
     MetricsSummaryResponse,
+    SyncJobListResponse,
+    SyncJobResponse,
     SyncRequest,
     SyncResponse,
 )
-from redmine_rag.core.config import get_settings
 from redmine_rag.extraction.properties import extract_issue_properties
 from redmine_rag.services.ask_service import answer_question
 from redmine_rag.services.metrics_service import get_metrics_summary
-from redmine_rag.services.sync_service import queue_sync_job
+from redmine_rag.services.ops_service import get_health_status
+from redmine_rag.services.sync_service import get_sync_job, list_sync_jobs, queue_sync_job
 
 router = APIRouter()
 
 
 @router.get("/healthz", response_model=HealthResponse)
 async def healthz() -> HealthResponse:
-    settings = get_settings()
-    return HealthResponse(
-        status="ok",
-        app=settings.app_name,
-        version=__version__,
-        utc_time=datetime.now(UTC),
-    )
+    return await get_health_status()
 
 
 @router.post("/v1/ask", response_model=AskResponse)
@@ -43,6 +38,22 @@ async def ask(payload: AskRequest) -> AskResponse:
 @router.post("/v1/sync/redmine", response_model=SyncResponse)
 async def sync_redmine(payload: SyncRequest, background_tasks: BackgroundTasks) -> SyncResponse:
     return await queue_sync_job(payload, background_tasks)
+
+
+@router.get("/v1/sync/jobs/{job_id}", response_model=SyncJobResponse)
+async def sync_job(job_id: str) -> SyncJobResponse:
+    job = await get_sync_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Sync job {job_id} was not found")
+    return job
+
+
+@router.get("/v1/sync/jobs", response_model=SyncJobListResponse)
+async def sync_jobs(
+    limit: int = Query(default=20, ge=1, le=200),
+    status: str | None = Query(default=None, pattern="^(queued|running|finished|failed)$"),
+) -> SyncJobListResponse:
+    return await list_sync_jobs(limit=limit, status=status)
 
 
 @router.post("/v1/extract/properties", response_model=ExtractResponse)

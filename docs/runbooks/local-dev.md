@@ -41,6 +41,13 @@ Sync behavior:
 - records global lifecycle in `sync_state` and per-entity cursor state in `sync_cursor`
 - incrementally refreshes `doc_chunk` sources and SQLite FTS index for lexical retrieval
 
+Inspect sync job status:
+
+```bash
+curl "http://127.0.0.1:8000/v1/sync/jobs?limit=20"
+curl "http://127.0.0.1:8000/v1/sync/jobs/<job_id>"
+```
+
 ## Full chunk reindex
 
 ```bash
@@ -107,6 +114,15 @@ For live eval run against local API:
 ```bash
 python3 scripts/eval/run_eval.py --api-base-url http://127.0.0.1:8000 --output-results evals/results.latest.jsonl
 ```
+
+## Ops commands
+
+```bash
+.venv/bin/python -m redmine_rag.cli ops backup --output-dir backups
+.venv/bin/python -m redmine_rag.cli ops maintenance
+```
+
+Recovery and incident procedures are in `docs/runbooks/operations.md`.
 
 ## Develop without real Redmine access
 

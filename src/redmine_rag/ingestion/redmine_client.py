@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
+from ipaddress import ip_address
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from redmine_rag.core.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class RedmineClient:
@@ -25,6 +30,11 @@ class RedmineClient:
         self._verify_ssl = settings.redmine_verify_ssl if verify_ssl is None else verify_ssl
         self._transport = transport
         self._extra_headers = extra_headers or {}
+        self._timeout_s = settings.redmine_http_timeout_s
+        self._allowed_hosts = {
+            host.strip().lower() for host in settings.redmine_allowed_hosts if host.strip()
+        }
+        self._validate_outbound_base_url()
 
     @retry(wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3), reraise=True)
     async def get_issues(
@@ -163,7 +173,7 @@ class RedmineClient:
         headers = {"X-Redmine-API-Key": self._api_key, **self._extra_headers}
 
         async with httpx.AsyncClient(
-            timeout=30,
+            timeout=self._timeout_s,
             verify=self._verify_ssl,
             transport=self._transport,
         ) as client:
@@ -171,3 +181,34 @@ class RedmineClient:
             response.raise_for_status()
             payload: dict[str, Any] = response.json()
             return payload
+
+    def _validate_outbound_base_url(self) -> None:
+        parsed = urlparse(self._base_url)
+        hostname = (parsed.hostname or "").lower()
+        if not hostname:
+            raise ValueError("Redmine base URL hostname is required")
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError("Redmine base URL must use http or https")
+
+        localhost_names = {"127.0.0.1", "localhost", "::1", "testserver"}
+        is_localhost = hostname in localhost_names
+        if parsed.scheme != "https" and not is_localhost:
+            raise ValueError(f"Outbound policy blocked non-HTTPS Redmine URL host={hostname!r}")
+        if self._allowed_hosts and hostname not in self._allowed_hosts:
+            raise ValueError(
+                f"Outbound policy blocked Redmine URL host={hostname!r}, "
+                "host not in REDMINE_ALLOWED_HOSTS"
+            )
+        if _is_private_ip(hostname) and not is_localhost:
+            logger.warning(
+                "Redmine outbound host resolves to private IP; verify allowlist policy",
+                extra={"redmine_host": hostname},
+            )
+
+
+def _is_private_ip(hostname: str) -> bool:
+    try:
+        ip = ip_address(hostname)
+    except ValueError:
+        return False
+    return bool(ip.is_private)

@@ -22,6 +22,9 @@ help:
 	@echo "  make eval-baseline - rebuild baseline eval artifacts"
 	@echo "  make eval-gate   - run regression gate against baseline"
 	@echo "  make dataset-quality - validate dataset quality constraints"
+	@echo "  make soak-medium - run medium-profile sync soak test"
+	@echo "  make backup      - create local state backup snapshot"
+	@echo "  make maintenance - run SQLite maintenance (checkpoint/vacuum/analyze)"
 	@echo "  make mock-redmine - run local Mock Redmine API"
 
 bootstrap:
@@ -72,6 +75,15 @@ eval-gate:
 
 dataset-quality:
 	$(RUNNER) scripts/eval/check_mock_dataset_quality.py --all-profiles
+
+soak-medium:
+	$(RUNNER) scripts/ops/soak_sync.py --iterations 3 --project-id 1
+
+backup:
+	$(RUNNER) -m redmine_rag.cli ops backup --output-dir backups
+
+maintenance:
+	$(RUNNER) -m redmine_rag.cli ops maintenance
 
 mock-redmine:
 	./scripts/mock-redmine.sh

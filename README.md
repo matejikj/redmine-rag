@@ -54,6 +54,8 @@ make eval-baseline
 make eval-gate
 make dataset-quality
 make mock-redmine
+.venv/bin/python -m redmine_rag.cli ops backup --output-dir backups
+.venv/bin/python -m redmine_rag.cli ops maintenance
 ```
 
 ## Project layout
@@ -62,6 +64,7 @@ make mock-redmine
 - `migrations/` Alembic migration scripts
 - `tests/` test suite
 - `docs/` architecture and runbooks
+- `docs/runbooks/operations.md` production operations, backup/recovery, and incident response
 - `docs/data-model.md` normalized and raw data model reference
 - `prompts/` reusable prompt assets
 - `evals/` evaluation datasets
@@ -72,6 +75,8 @@ make mock-redmine
 - `GET /healthz`
 - `POST /v1/ask`
 - `POST /v1/sync/redmine`
+- `GET /v1/sync/jobs`
+- `GET /v1/sync/jobs/{job_id}`
 - `POST /v1/extract/properties`
 - `GET /v1/metrics/summary`
 

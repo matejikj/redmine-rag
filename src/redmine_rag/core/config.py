@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlparse
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -53,7 +54,10 @@ class Settings(BaseSettings):
     redmine_board_ids: list[int] = Field(default_factory=list)
     redmine_wiki_pages: list[str] = Field(default_factory=list)
     redmine_verify_ssl: bool = True
+    redmine_http_timeout_s: float = 30.0
+    redmine_allowed_hosts: list[str] = Field(default_factory=list)
     sync_overlap_minutes: int = 15
+    sync_job_history_limit: int = 100
 
     llm_provider: str = "api"
     llm_model: str = "gpt-5-mini"
@@ -63,6 +67,11 @@ class Settings(BaseSettings):
     llm_extract_max_context_chars: int = 6000
     llm_extract_timeout_s: float = 20.0
     llm_extract_cost_limit_usd: float = 1.0
+
+    @field_validator("app_env")
+    @classmethod
+    def normalize_app_env(cls, value: str) -> str:
+        return value.strip().lower()
 
     @field_validator("redmine_project_ids", mode="before")
     @classmethod
@@ -108,6 +117,17 @@ class Settings(BaseSettings):
             return [item.strip() for item in value.split(",") if item.strip()]
         raise ValueError("Invalid REDMINE_WIKI_PAGES value")
 
+    @field_validator("redmine_allowed_hosts", mode="before")
+    @classmethod
+    def parse_allowed_hosts(cls, value: object) -> list[str]:
+        if value is None or value == "":
+            return []
+        if isinstance(value, list):
+            return [str(item).strip().lower() for item in value if str(item).strip()]
+        if isinstance(value, str):
+            return [item.strip().lower() for item in value.split(",") if item.strip()]
+        raise ValueError("Invalid REDMINE_ALLOWED_HOSTS value")
+
     @field_validator(
         "embedding_dim",
         "retrieval_rrf_k",
@@ -115,6 +135,7 @@ class Settings(BaseSettings):
         "llm_extract_max_retries",
         "llm_extract_batch_size",
         "llm_extract_max_context_chars",
+        "sync_job_history_limit",
     )
     @classmethod
     def validate_positive_ints(cls, value: int) -> int:
@@ -129,12 +150,33 @@ class Settings(BaseSettings):
             raise ValueError("Weight must be >= 0")
         return value
 
-    @field_validator("llm_extract_timeout_s", "llm_extract_cost_limit_usd")
+    @field_validator(
+        "llm_extract_timeout_s",
+        "llm_extract_cost_limit_usd",
+        "redmine_http_timeout_s",
+    )
     @classmethod
     def validate_non_negative_floats(cls, value: float) -> float:
         if value < 0:
             raise ValueError("Value must be >= 0")
         return value
+
+    @field_validator("redmine_api_key")
+    @classmethod
+    def validate_redmine_api_key(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("REDMINE_API_KEY must not be empty")
+        return value
+
+    @field_validator("redmine_base_url")
+    @classmethod
+    def validate_redmine_base_url(cls, value: str) -> str:
+        parsed = urlparse(value.strip())
+        if not parsed.scheme or not parsed.netloc:
+            raise ValueError("REDMINE_BASE_URL must be absolute URL")
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError("REDMINE_BASE_URL must use http or https")
+        return value.strip()
 
     @property
     def data_dir(self) -> Path:
@@ -143,6 +185,15 @@ class Settings(BaseSettings):
     @property
     def index_dir(self) -> Path:
         return Path("indexes")
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> Settings:
+        if self.app_env in {"prod", "production"}:
+            if self.redmine_api_key.strip() in {"replace_me", "changeme", "test", "mock-api-key"}:
+                raise ValueError("In production set non-placeholder REDMINE_API_KEY")
+            if not self.redmine_allowed_hosts:
+                raise ValueError("In production set REDMINE_ALLOWED_HOSTS outbound allowlist")
+        return self
 
 
 @lru_cache(maxsize=1)

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from redmine_rag.api.schemas import AskFilters, AskRequest
+from redmine_rag.db.base import Base
+from redmine_rag.db.session import get_engine, get_session_factory
 from redmine_rag.main import app
 from redmine_rag.services import ask_service
 from redmine_rag.services.retrieval_service import (
@@ -30,7 +33,30 @@ def _mock_result(chunks: list[RetrievedChunk], *, mode: str = "hybrid") -> Hybri
     )
 
 
-def test_ask_returns_grounded_fallback_when_no_data() -> None:
+@pytest.fixture
+async def isolated_ask_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    db_path = tmp_path / "ask.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{db_path}")
+
+    from redmine_rag.core.config import get_settings
+
+    get_settings.cache_clear()
+    get_engine.cache_clear()
+    get_session_factory.cache_clear()
+
+    engine = get_engine()
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+
+    yield
+
+    await engine.dispose()
+    get_settings.cache_clear()
+    get_engine.cache_clear()
+    get_session_factory.cache_clear()
+
+
+def test_ask_returns_grounded_fallback_when_no_data(isolated_ask_env: None) -> None:
     client = TestClient(app)
 
     response = client.post(

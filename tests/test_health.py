@@ -10,5 +10,7 @@ def test_health_endpoint() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["status"] == "ok"
+    assert payload["status"] in {"ok", "degraded", "fail"}
     assert payload["app"] == "redmine-rag"
+    assert "checks" in payload
+    assert "sync_jobs" in payload

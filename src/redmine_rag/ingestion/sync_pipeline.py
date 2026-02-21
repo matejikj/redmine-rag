@@ -156,10 +156,10 @@ async def run_incremental_sync(
 
                 handler = handlers[module_name]
                 try:
-                    logger.info("Running sync module", extra={"module": module_name})
+                    logger.info("Running sync module", extra={"sync_module": module_name})
                     await handler(context, summary)
                     await session.commit()
-                    logger.info("Sync module finished", extra={"module": module_name})
+                    logger.info("Sync module finished", extra={"sync_module": module_name})
                 except httpx.HTTPStatusError as exc:
                     status_code = exc.response.status_code
                     if status_code in {403, 404, 405, 501}:
@@ -167,7 +167,7 @@ async def run_incremental_sync(
                         logger.warning(
                             "Skipping unsupported module",
                             extra={
-                                "module": module_name,
+                                "sync_module": module_name,
                                 "status_code": status_code,
                                 "detail": str(exc),
                             },

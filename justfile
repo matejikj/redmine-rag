@@ -32,3 +32,6 @@ sync:
 
 eval:
   python3 scripts/eval/run_eval.py
+
+mock-redmine:
+  ./scripts/mock-redmine.sh

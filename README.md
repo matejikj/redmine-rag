@@ -45,6 +45,7 @@ make test
 make check
 make sync
 make eval
+make mock-redmine
 ```
 
 ## Project layout
@@ -64,6 +65,23 @@ make eval
 - `POST /v1/ask`
 - `POST /v1/sync/redmine`
 - `POST /v1/extract/properties`
+
+## Mock Redmine API
+
+For local development without real Redmine access:
+
+```bash
+make mock-redmine
+```
+
+Then set:
+
+```bash
+REDMINE_BASE_URL=http://127.0.0.1:8081
+REDMINE_API_KEY=mock-api-key
+```
+
+See `docs/runbooks/mock-redmine.md` for details.
 
 ## Agent-first development
 

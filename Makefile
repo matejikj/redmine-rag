@@ -16,6 +16,7 @@ help:
 	@echo "  make check       - run all checks"
 	@echo "  make sync        - trigger Redmine sync"
 	@echo "  make eval        - run local eval scaffold"
+	@echo "  make mock-redmine - run local Mock Redmine API"
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -49,3 +50,6 @@ sync:
 
 eval:
 	$(PYTHON) scripts/eval/run_eval.py
+
+mock-redmine:
+	./scripts/mock-redmine.sh

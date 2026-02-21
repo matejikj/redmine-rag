@@ -25,3 +25,11 @@ curl http://127.0.0.1:8000/healthz
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/sync/redmine -H 'content-type: application/json' -d '{}'
 ```
+
+## Develop without real Redmine access
+
+```bash
+make mock-redmine
+```
+
+Set `.env` to local mock values (see `docs/runbooks/mock-redmine.md`).

@@ -5,6 +5,7 @@ Agent-first platform for retrieving Redmine knowledge (issues, journals, wiki), 
 ## Goals
 
 - Ingest Redmine data incrementally (`updated_on` based sync).
+- Persist both raw payloads and normalized entities with idempotent upserts.
 - Build hybrid retrieval (FTS + vector similarity).
 - Generate answers grounded in retrieved chunks.
 - Enforce citations per claim and keep full auditability.
@@ -85,6 +86,20 @@ REDMINE_API_KEY=mock-api-key
 ```
 
 See `docs/runbooks/mock-redmine.md` for details.
+
+## Ingestion module configuration
+
+You can enable/disable ingestion modules via `.env`:
+
+```bash
+REDMINE_MODULES=projects,users,groups,trackers,issue_statuses,issue_priorities,issues,time_entries,news,documents,files,boards,wiki
+REDMINE_BOARD_IDS=94001,94003
+REDMINE_WIKI_PAGES=platform-core:Feature-Login,platform-core:Incident-Triage-Playbook
+```
+
+- `REDMINE_MODULES`: registry toggle for sync pipeline modules.
+- `REDMINE_BOARD_IDS`: board IDs for board/message ingestion.
+- `REDMINE_WIKI_PAGES`: wiki references in `project_ref:title` format.
 
 ## Agent-first development
 

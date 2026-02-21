@@ -30,6 +30,9 @@ In `.env`:
 ```bash
 REDMINE_BASE_URL=http://127.0.0.1:8081
 REDMINE_API_KEY=mock-api-key
+REDMINE_PROJECT_IDS=1
+REDMINE_BOARD_IDS=94001,94003
+REDMINE_WIKI_PAGES=platform-core:Feature-Login,platform-core:Incident-Triage-Playbook
 ```
 
 ## Switch to production later

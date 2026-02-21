@@ -28,6 +28,18 @@ curl http://127.0.0.1:8000/healthz
 curl -X POST http://127.0.0.1:8000/v1/sync/redmine -H 'content-type: application/json' -d '{}'
 ```
 
+Or from CLI:
+
+```bash
+make sync
+```
+
+Sync behavior:
+- runs deterministic module order (`projects` -> `wiki`)
+- persists raw and normalized rows with idempotent upserts
+- updates incremental cursors for entities with `updated_on` filtering (`issues`, `time_entries`)
+- records global lifecycle in `sync_state` and per-entity cursor state in `sync_cursor`
+
 ## Develop without real Redmine access
 
 ```bash

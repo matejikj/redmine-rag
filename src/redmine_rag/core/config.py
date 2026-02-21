@@ -8,7 +8,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        enable_decoding=False,
+    )
 
     app_env: str = "dev"
     app_name: str = "redmine-rag"
@@ -23,6 +28,25 @@ class Settings(BaseSettings):
     redmine_base_url: str = "https://redmine.example.com"
     redmine_api_key: str = "replace_me"
     redmine_project_ids: list[int] = Field(default_factory=list)
+    redmine_modules: list[str] = Field(
+        default_factory=lambda: [
+            "projects",
+            "users",
+            "groups",
+            "trackers",
+            "issue_statuses",
+            "issue_priorities",
+            "issues",
+            "time_entries",
+            "news",
+            "documents",
+            "files",
+            "boards",
+            "wiki",
+        ]
+    )
+    redmine_board_ids: list[int] = Field(default_factory=list)
+    redmine_wiki_pages: list[str] = Field(default_factory=list)
     redmine_verify_ssl: bool = True
     sync_overlap_minutes: int = 15
 
@@ -39,6 +63,39 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [int(item.strip()) for item in value.split(",") if item.strip()]
         raise ValueError("Invalid REDMINE_PROJECT_IDS value")
+
+    @field_validator("redmine_board_ids", mode="before")
+    @classmethod
+    def parse_board_ids(cls, value: object) -> list[int]:
+        if value is None or value == "":
+            return []
+        if isinstance(value, list):
+            return [int(item) for item in value]
+        if isinstance(value, str):
+            return [int(item.strip()) for item in value.split(",") if item.strip()]
+        raise ValueError("Invalid REDMINE_BOARD_IDS value")
+
+    @field_validator("redmine_modules", mode="before")
+    @classmethod
+    def parse_modules(cls, value: object) -> list[str]:
+        if value is None or value == "":
+            return []
+        if isinstance(value, list):
+            return [str(item).strip().lower() for item in value if str(item).strip()]
+        if isinstance(value, str):
+            return [item.strip().lower() for item in value.split(",") if item.strip()]
+        raise ValueError("Invalid REDMINE_MODULES value")
+
+    @field_validator("redmine_wiki_pages", mode="before")
+    @classmethod
+    def parse_wiki_pages(cls, value: object) -> list[str]:
+        if value is None or value == "":
+            return []
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        raise ValueError("Invalid REDMINE_WIKI_PAGES value")
 
     @property
     def data_dir(self) -> Path:

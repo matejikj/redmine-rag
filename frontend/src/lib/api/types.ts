@@ -54,6 +54,7 @@ export interface AskResponse {
 
 export interface SyncRequest {
   project_ids: number[] | null;
+  modules: string[] | null;
 }
 
 export interface SyncResponse {
@@ -78,3 +79,21 @@ export interface SyncJobListResponse {
   total: number;
   counts: SyncJobCounts;
 }
+
+export const SYNC_MODULES = [
+  "projects",
+  "users",
+  "groups",
+  "trackers",
+  "issue_statuses",
+  "issue_priorities",
+  "issues",
+  "time_entries",
+  "news",
+  "documents",
+  "files",
+  "boards",
+  "wiki"
+] as const;
+
+export type SyncModule = (typeof SYNC_MODULES)[number];

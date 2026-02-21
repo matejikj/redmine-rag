@@ -1,10 +1,14 @@
 from fastapi.testclient import TestClient
 
-from redmine_rag.main import app
+from redmine_rag import main as main_module
 
 
-def test_ui_index_returns_actionable_message_when_bundle_missing() -> None:
-    client = TestClient(app)
+def test_ui_index_returns_actionable_message_when_bundle_missing(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(main_module, "_FRONTEND_DIST_DIR", tmp_path / "missing-dist")
+    client = TestClient(main_module.app)
 
     response = client.get("/app")
 
@@ -13,8 +17,12 @@ def test_ui_index_returns_actionable_message_when_bundle_missing() -> None:
     assert "Frontend build missing" in payload["detail"]
 
 
-def test_ui_spa_route_returns_actionable_message_when_bundle_missing() -> None:
-    client = TestClient(app)
+def test_ui_spa_route_returns_actionable_message_when_bundle_missing(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(main_module, "_FRONTEND_DIST_DIR", tmp_path / "missing-dist")
+    client = TestClient(main_module.app)
 
     response = client.get("/app/sync")
 

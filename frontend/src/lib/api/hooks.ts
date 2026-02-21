@@ -21,6 +21,16 @@ export function useSyncJobsQuery(status: string | null) {
   });
 }
 
+export function useSyncJobQuery(jobId: string | null) {
+  return useQuery({
+    queryKey: ["sync-job", jobId],
+    queryFn: () => apiClient.getSyncJob(jobId as string),
+    enabled: Boolean(jobId),
+    staleTime: 1_000,
+    refetchInterval: 3_000
+  });
+}
+
 export function useTriggerSyncMutation() {
   return useMutation({
     mutationFn: (payload: SyncRequest) => apiClient.triggerSync(payload)

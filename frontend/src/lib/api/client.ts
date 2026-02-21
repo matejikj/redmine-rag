@@ -2,6 +2,7 @@ import type {
   AskRequest,
   AskResponse,
   HealthResponse,
+  SyncJobResponse,
   SyncJobListResponse,
   SyncRequest,
   SyncResponse
@@ -88,5 +89,8 @@ export const apiClient = {
       search.set("status", params.status);
     }
     return requestJson<SyncJobListResponse>(`/v1/sync/jobs?${search.toString()}`);
+  },
+  getSyncJob(jobId: string): Promise<SyncJobResponse> {
+    return requestJson<SyncJobResponse>(`/v1/sync/jobs/${jobId}`);
   }
 };

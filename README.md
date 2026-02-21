@@ -41,6 +41,12 @@ make ui-dev
 
 Open `http://127.0.0.1:5173` (development proxy to backend API).
 
+Task 17 sync control center is available under `Sync` page in the UI:
+- trigger sync with project scope and module toggles
+- monitor live job list with status filters
+- inspect per-job ingestion/indexing summary
+- retry failed jobs with preserved scope/modules
+
 ## Docker (optional)
 
 ```bash

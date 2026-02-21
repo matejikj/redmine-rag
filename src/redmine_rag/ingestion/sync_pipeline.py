@@ -55,12 +55,15 @@ async def run_incremental_sync(
     project_ids: list[int],
     *,
     client: RedmineClient | None = None,
+    modules_override: list[str] | None = None,
 ) -> dict[str, Any]:
     """Run one full incremental sync cycle with deterministic module ordering."""
 
     settings = get_settings()
     effective_project_ids = project_ids or settings.redmine_project_ids
-    enabled_modules = set(settings.redmine_modules or MODULE_ORDER)
+    enabled_modules = (
+        set(modules_override) if modules_override else set(settings.redmine_modules or MODULE_ORDER)
+    )
     fetched_at = datetime.now(UTC)
 
     summary: dict[str, Any] = {

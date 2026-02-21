@@ -31,7 +31,10 @@ async def queue_sync_job(payload: SyncRequest, background_tasks: BackgroundTasks
             SyncJob(
                 id=job_id,
                 status="queued",
-                payload={"project_ids": payload.project_ids or []},
+                payload={
+                    "project_ids": payload.project_ids or [],
+                    "modules": payload.modules,
+                },
             )
         )
         await session.commit()
@@ -39,7 +42,11 @@ async def queue_sync_job(payload: SyncRequest, background_tasks: BackgroundTasks
     background_tasks.add_task(_run_sync_job, job_id)
     logger.info(
         "Sync job queued",
-        extra={"job_id": job_id, "project_ids": payload.project_ids or []},
+        extra={
+            "job_id": job_id,
+            "project_ids": payload.project_ids or [],
+            "modules": payload.modules,
+        },
     )
 
     return SyncResponse(job_id=job_id, accepted=True, detail="Sync job queued")
@@ -107,7 +114,11 @@ async def _run_sync_job(job_id: str) -> None:
 
         try:
             project_ids = list(job.payload.get("project_ids", []))
-            summary = await run_incremental_sync(project_ids=project_ids)
+            raw_modules = job.payload.get("modules")
+            modules = (
+                [str(module) for module in raw_modules] if isinstance(raw_modules, list) else None
+            )
+            summary = await run_incremental_sync(project_ids=project_ids, modules_override=modules)
             job.status = "finished"
             job.finished_at = datetime.now(UTC)
             job.payload = {**job.payload, "summary": summary}

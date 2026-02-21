@@ -132,3 +132,42 @@ async def test_sync_job_failure_injection_marks_job_failed(
     assert row.error_message is not None
     assert "simulated network failure" in row.error_message
     assert row.payload["error_type"] == "ConnectError"
+
+
+@pytest.mark.asyncio
+async def test_sync_job_passes_module_override_to_pipeline(
+    isolated_sync_jobs_env: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    async def _fake_incremental_sync(*, project_ids: list[int], modules_override: list[str] | None):
+        captured["project_ids"] = project_ids
+        captured["modules_override"] = modules_override
+        return {"issues_synced": 1, "modules_enabled": modules_override or []}
+
+    monkeypatch.setattr(sync_service, "run_incremental_sync", _fake_incremental_sync)
+
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        session.add(
+            SyncJob(
+                id="job-modules-test",
+                status="queued",
+                payload={"project_ids": [1], "modules": ["issues", "news"]},
+            )
+        )
+        await session.commit()
+
+    await sync_service._run_sync_job("job-modules-test")
+
+    assert captured["project_ids"] == [1]
+    assert captured["modules_override"] == ["issues", "news"]
+
+    async with session_factory() as session:
+        row = await session.scalar(select(SyncJob).where(SyncJob.id == "job-modules-test"))
+
+    assert row is not None
+    assert row.status == "finished"
+    assert row.payload["modules"] == ["issues", "news"]
+    assert "summary" in row.payload

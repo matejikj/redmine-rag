@@ -25,6 +25,12 @@ make ui-dev
 
 Open `http://127.0.0.1:5173`.
 
+Sync control center workflow (Task 17):
+- open `Sync` page
+- set project scope + module toggles
+- trigger sync and monitor live table updates
+- select a failed job and use `Retry selected job`
+
 Backend-served SPA mode:
 
 ```bash

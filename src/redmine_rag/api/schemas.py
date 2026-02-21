@@ -3,9 +3,24 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 PositiveInt = Annotated[int, Field(gt=0)]
+SYNC_MODULE_CHOICES: tuple[str, ...] = (
+    "projects",
+    "users",
+    "groups",
+    "trackers",
+    "issue_statuses",
+    "issue_priorities",
+    "issues",
+    "time_entries",
+    "news",
+    "documents",
+    "files",
+    "boards",
+    "wiki",
+)
 
 
 class HealthCheck(BaseModel):
@@ -62,6 +77,31 @@ class AskResponse(BaseModel):
 
 class SyncRequest(BaseModel):
     project_ids: list[PositiveInt] | None = Field(default=None, max_length=200)
+    modules: list[str] | None = Field(default=None, max_length=len(SYNC_MODULE_CHOICES))
+
+    @field_validator("modules", mode="before")
+    @classmethod
+    def normalize_modules(cls, value: object) -> list[str] | None:
+        if value is None or value == "":
+            return None
+        if isinstance(value, str):
+            candidates = [item.strip().lower() for item in value.split(",") if item.strip()]
+        elif isinstance(value, list):
+            candidates = [str(item).strip().lower() for item in value if str(item).strip()]
+        else:
+            raise ValueError("Invalid modules payload")
+
+        normalized: list[str] = []
+        seen: set[str] = set()
+        allowed = set(SYNC_MODULE_CHOICES)
+        for module in candidates:
+            if module not in allowed:
+                raise ValueError(f"Unsupported module '{module}'")
+            if module in seen:
+                continue
+            seen.add(module)
+            normalized.append(module)
+        return normalized or None
 
 
 class SyncResponse(BaseModel):

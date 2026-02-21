@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "check",
+      "type": "shell",
+      "command": "make check",
+      "group": "test"
+    },
+    {
+      "label": "dev",
+      "type": "shell",
+      "command": "make dev",
+      "group": "build"
+    }
+  ]
+}

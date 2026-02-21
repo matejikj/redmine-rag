@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.venv/
+.uv-cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# IDEs
+.vscode/settings.json
+.idea/
+
+# OS
+.DS_Store
+
+# Env
+.env
+.env.*
+!.env.example
+
+# DB and data
+*.db
+*.db-shm
+*.db-wal
+data/
+indexes/
+logs/
+
+# Alembic
+migrations/versions/*.pyc

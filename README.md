@@ -84,6 +84,9 @@ make mock-redmine
 - returns only grounded claims derived from retrieved chunks
 - enforces citation marker per claim (`[1]`, `[2]`, ...)
 - returns explicit "not enough evidence" fallback when grounding is insufficient
+- supports synthesis modes via `ASK_ANSWER_MODE`:
+  - `deterministic` (default)
+  - `llm_grounded` (LLM-generated claims validated against citation snippets)
 
 Deterministic extraction:
 - `POST /v1/extract/properties` computes `issue_metric` + `issue_property` with extractor version `det-v1`.
@@ -124,6 +127,7 @@ export LLM_PROVIDER=ollama
 export LLM_EXTRACT_ENABLED=true
 export OLLAMA_BASE_URL=http://127.0.0.1:11434
 export OLLAMA_MODEL=Mistral-7B-Instruct-v0.3-Q4_K_M
+export ASK_ANSWER_MODE=llm_grounded
 ```
 
 Metrics summary endpoint:

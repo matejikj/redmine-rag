@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     retrieval_vector_weight: float = 0.35
     retrieval_rrf_k: int = 60
     retrieval_candidate_multiplier: int = 4
+    ask_answer_mode: str = "deterministic"
+    ask_llm_timeout_s: float = 20.0
+    ask_llm_max_claims: int = 5
 
     redmine_base_url: str = "https://redmine.example.com"
     redmine_api_key: str = "replace_me"
@@ -136,6 +139,7 @@ class Settings(BaseSettings):
         "embedding_dim",
         "retrieval_rrf_k",
         "retrieval_candidate_multiplier",
+        "ask_llm_max_claims",
         "llm_extract_max_retries",
         "llm_extract_batch_size",
         "llm_extract_max_context_chars",
@@ -160,12 +164,21 @@ class Settings(BaseSettings):
         "llm_extract_cost_limit_usd",
         "redmine_http_timeout_s",
         "ollama_timeout_s",
+        "ask_llm_timeout_s",
     )
     @classmethod
     def validate_non_negative_floats(cls, value: float) -> float:
         if value < 0:
             raise ValueError("Value must be >= 0")
         return value
+
+    @field_validator("ask_answer_mode")
+    @classmethod
+    def validate_ask_answer_mode(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"deterministic", "llm_grounded"}:
+            raise ValueError("ASK_ANSWER_MODE must be one of: deterministic, llm_grounded")
+        return normalized
 
     @field_validator("redmine_api_key")
     @classmethod

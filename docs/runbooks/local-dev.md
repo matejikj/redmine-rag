@@ -93,12 +93,21 @@ export OLLAMA_BASE_URL=http://127.0.0.1:11434
 export OLLAMA_MODEL=Mistral-7B-Instruct-v0.3-Q4_K_M
 export OLLAMA_TIMEOUT_S=45
 export OLLAMA_MAX_CONCURRENCY=2
+export ASK_ANSWER_MODE=llm_grounded
 ```
 
 Runtime readiness is visible in:
 
 ```bash
 curl http://127.0.0.1:8000/healthz
+```
+
+Ask endpoint with grounded LLM synthesis:
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/ask \
+  -H 'content-type: application/json' \
+  -d '{"query":"What is the login callback issue and rollback plan?","filters":{"project_ids":[1]},"top_k":5}'
 ```
 
 Or via API:

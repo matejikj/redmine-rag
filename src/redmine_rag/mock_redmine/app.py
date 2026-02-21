@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable
+from collections import defaultdict
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -36,6 +37,36 @@ PRIORITY_BY_ID = {priority["id"]: priority for priority in ISSUE_PRIORITIES}
 ISSUE_BY_ID = {issue["id"]: issue for issue in ISSUES}
 BOARD_BY_ID = {board["id"]: board for board in BOARDS}
 MESSAGE_BY_ID = {message["id"]: message for message in MESSAGES}
+WIKI_PAGE_BY_PROJECT_AND_TITLE = {
+    (page["project_id"], page["title"].lower()): page for page in WIKI_PAGES
+}
+
+PROJECTS_SORTED = tuple(sorted(PROJECTS, key=lambda project: int(project["id"])))
+USERS_SORTED = tuple(sorted(USERS, key=lambda user: int(user["id"])))
+GROUPS_SORTED = tuple(sorted(GROUPS, key=lambda group: int(group["id"])))
+ISSUES_SORTED = tuple(sorted(ISSUES, key=lambda issue: int(issue["id"])))
+TIME_ENTRIES_SORTED = tuple(sorted(TIME_ENTRIES, key=lambda entry: int(entry["id"])))
+NEWS_SORTED = tuple(sorted(NEWS, key=lambda entry: int(entry["id"])))
+DOCUMENTS_SORTED = tuple(sorted(DOCUMENTS, key=lambda entry: int(entry["id"])))
+FILES_SORTED = tuple(sorted(FILES, key=lambda entry: int(entry["id"])))
+
+_topics_by_board_id: dict[int, list[dict[str, Any]]] = defaultdict(list)
+_replies_by_parent_id: dict[int, list[dict[str, Any]]] = defaultdict(list)
+for message in MESSAGES:
+    parent_id = message["parent_id"]
+    if parent_id is None:
+        _topics_by_board_id[message["board_id"]].append(message)
+        continue
+    _replies_by_parent_id[parent_id].append(message)
+
+TOPICS_BY_BOARD_ID = {
+    board_id: tuple(sorted(items, key=lambda item: int(item["id"])))
+    for board_id, items in _topics_by_board_id.items()
+}
+REPLIES_BY_PARENT_ID = {
+    parent_id: tuple(sorted(items, key=lambda item: int(item["id"])))
+    for parent_id, items in _replies_by_parent_id.items()
+}
 
 
 @dataclass(frozen=True)
@@ -131,13 +162,25 @@ def _parse_project_ids(project_ids_raw: str | None) -> set[int] | None:
     return parsed
 
 
-def _paginate(
-    items: list[dict[str, Any]],
+def _collect_page(
+    items: Iterable[dict[str, Any]],
+    *,
     offset: int,
     limit: int,
+    predicate: Callable[[dict[str, Any]], bool] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
-    total_count = len(items)
-    return items[offset : offset + limit], total_count
+    page: list[dict[str, Any]] = []
+    total_count = 0
+    page_end = offset + limit
+
+    for item in items:
+        if predicate is not None and not predicate(item):
+            continue
+        if offset <= total_count < page_end:
+            page.append(item)
+        total_count += 1
+
+    return page, total_count
 
 
 def _is_project_visible(project_id: int, auth: AuthContext) -> bool:
@@ -286,32 +329,16 @@ def _serialize_issue(issue: dict[str, Any], include_fields: set[str]) -> dict[st
 def _paginate_response(
     key: str,
     items: list[dict[str, Any]],
+    total_count: int,
     limit: int,
     offset: int,
 ) -> dict[str, Any]:
-    page, total_count = _paginate(items, offset=offset, limit=limit)
     return {
-        key: page,
+        key: items,
         "total_count": total_count,
         "offset": offset,
         "limit": limit,
     }
-
-
-def _filter_visible_project_items(
-    items: Iterable[dict[str, Any]],
-    auth: AuthContext,
-    project_ids: set[int] | None = None,
-) -> list[dict[str, Any]]:
-    result: list[dict[str, Any]] = []
-    for item in items:
-        project_id = item["project_id"]
-        if project_ids is not None and project_id not in project_ids:
-            continue
-        if not _is_project_visible(project_id, auth):
-            continue
-        result.append(item)
-    return result
 
 
 @app.get("/projects.json")
@@ -320,9 +347,13 @@ def list_projects(
     limit: int = Query(25, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
-    visible_projects = [project for project in PROJECTS if _is_project_visible(project["id"], auth)]
-    visible_projects.sort(key=lambda project: project["id"])
-    return _paginate_response("projects", visible_projects, limit, offset)
+    projects_page, total_count = _collect_page(
+        PROJECTS_SORTED,
+        offset=offset,
+        limit=limit,
+        predicate=lambda project: _is_project_visible(project["id"], auth),
+    )
+    return _paginate_response("projects", projects_page, total_count, limit, offset)
 
 
 @app.get("/users.json")
@@ -331,8 +362,8 @@ def list_users(
     limit: int = Query(25, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
-    users = sorted(USERS, key=lambda user: user["id"])
-    return _paginate_response("users", users, limit, offset)
+    users_page, total_count = _collect_page(USERS_SORTED, offset=offset, limit=limit)
+    return _paginate_response("users", users_page, total_count, limit, offset)
 
 
 @app.get("/groups.json")
@@ -341,7 +372,7 @@ def list_groups(
     limit: int = Query(25, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
-    groups = [
+    groups_payload = [
         {
             "id": group["id"],
             "name": group["name"],
@@ -351,9 +382,10 @@ def list_groups(
                 if user_ref is not None
             ],
         }
-        for group in sorted(GROUPS, key=lambda entry: entry["id"])
+        for group in GROUPS_SORTED
     ]
-    return _paginate_response("groups", groups, limit, offset)
+    groups_page, total_count = _collect_page(groups_payload, offset=offset, limit=limit)
+    return _paginate_response("groups", groups_page, total_count, limit, offset)
 
 
 @app.get("/trackers.json")
@@ -384,15 +416,21 @@ def list_issues(
     updated_filter = _parse_updated_filter(updated_on)
     include_fields = _parse_includes(include)
 
-    filtered = _filter_visible_project_items(ISSUES, auth, project_ids=project_ids)
-    filtered = [issue for issue in filtered if _is_issue_visible(issue, auth)]
-    filtered = [
-        issue for issue in filtered if _matches_updated_filter(issue["updated_on"], updated_filter)
-    ]
-    filtered.sort(key=lambda issue: issue["id"])
+    def _issue_matches(issue: dict[str, Any]) -> bool:
+        if project_ids is not None and issue["project_id"] not in project_ids:
+            return False
+        if not _is_issue_visible(issue, auth):
+            return False
+        return _matches_updated_filter(issue["updated_on"], updated_filter)
 
-    serialized = [_serialize_issue(issue, include_fields=include_fields) for issue in filtered]
-    return _paginate_response("issues", serialized, limit, offset)
+    issues_page, total_count = _collect_page(
+        ISSUES_SORTED,
+        offset=offset,
+        limit=limit,
+        predicate=_issue_matches,
+    )
+    payload = [_serialize_issue(issue, include_fields=include_fields) for issue in issues_page]
+    return _paginate_response("issues", payload, total_count, limit, offset)
 
 
 @app.get("/issues/{issue_id}.json")
@@ -421,12 +459,19 @@ def list_time_entries(
     project_ids = _parse_project_ids(project_id)
     updated_filter = _parse_updated_filter(updated_on)
 
-    filtered = _filter_visible_project_items(TIME_ENTRIES, auth, project_ids=project_ids)
-    filtered = [
-        entry for entry in filtered if _matches_updated_filter(entry["updated_on"], updated_filter)
-    ]
-    filtered.sort(key=lambda entry: entry["id"])
+    def _time_entry_matches(entry: dict[str, Any]) -> bool:
+        if project_ids is not None and entry["project_id"] not in project_ids:
+            return False
+        if not _is_project_visible(entry["project_id"], auth):
+            return False
+        return _matches_updated_filter(entry["updated_on"], updated_filter)
 
+    time_entries_page, total_count = _collect_page(
+        TIME_ENTRIES_SORTED,
+        offset=offset,
+        limit=limit,
+        predicate=_time_entry_matches,
+    )
     payload = [
         {
             "id": entry["id"],
@@ -440,10 +485,10 @@ def list_time_entries(
             "created_on": entry["created_on"],
             "updated_on": entry["updated_on"],
         }
-        for entry in filtered
+        for entry in time_entries_page
     ]
 
-    return _paginate_response("time_entries", payload, limit, offset)
+    return _paginate_response("time_entries", payload, total_count, limit, offset)
 
 
 @app.get("/news.json")
@@ -454,9 +499,18 @@ def list_news(
     auth: AuthContext = Depends(get_auth_context),
 ) -> dict[str, Any]:
     project_ids = _parse_project_ids(project_id)
-    filtered = _filter_visible_project_items(NEWS, auth, project_ids=project_ids)
-    filtered.sort(key=lambda entry: entry["id"])
 
+    def _news_matches(entry: dict[str, Any]) -> bool:
+        if project_ids is not None and entry["project_id"] not in project_ids:
+            return False
+        return _is_project_visible(entry["project_id"], auth)
+
+    news_page, total_count = _collect_page(
+        NEWS_SORTED,
+        offset=offset,
+        limit=limit,
+        predicate=_news_matches,
+    )
     payload = [
         {
             "id": entry["id"],
@@ -467,9 +521,9 @@ def list_news(
             "author": _user_ref(entry["author_id"]),
             "created_on": entry["created_on"],
         }
-        for entry in filtered
+        for entry in news_page
     ]
-    return _paginate_response("news", payload, limit, offset)
+    return _paginate_response("news", payload, total_count, limit, offset)
 
 
 @app.get("/documents.json")
@@ -480,9 +534,18 @@ def list_documents(
     auth: AuthContext = Depends(get_auth_context),
 ) -> dict[str, Any]:
     project_ids = _parse_project_ids(project_id)
-    filtered = _filter_visible_project_items(DOCUMENTS, auth, project_ids=project_ids)
-    filtered.sort(key=lambda entry: entry["id"])
 
+    def _document_matches(entry: dict[str, Any]) -> bool:
+        if project_ids is not None and entry["project_id"] not in project_ids:
+            return False
+        return _is_project_visible(entry["project_id"], auth)
+
+    documents_page, total_count = _collect_page(
+        DOCUMENTS_SORTED,
+        offset=offset,
+        limit=limit,
+        predicate=_document_matches,
+    )
     payload = [
         {
             "id": entry["id"],
@@ -492,10 +555,10 @@ def list_documents(
             "description": entry["description"],
             "created_on": entry["created_on"],
         }
-        for entry in filtered
+        for entry in documents_page
     ]
 
-    return _paginate_response("documents", payload, limit, offset)
+    return _paginate_response("documents", payload, total_count, limit, offset)
 
 
 @app.get("/files.json")
@@ -506,9 +569,18 @@ def list_files(
     auth: AuthContext = Depends(get_auth_context),
 ) -> dict[str, Any]:
     project_ids = _parse_project_ids(project_id)
-    filtered = _filter_visible_project_items(FILES, auth, project_ids=project_ids)
-    filtered.sort(key=lambda entry: entry["id"])
 
+    def _file_matches(entry: dict[str, Any]) -> bool:
+        if project_ids is not None and entry["project_id"] not in project_ids:
+            return False
+        return _is_project_visible(entry["project_id"], auth)
+
+    files_page, total_count = _collect_page(
+        FILES_SORTED,
+        offset=offset,
+        limit=limit,
+        predicate=_file_matches,
+    )
     payload = [
         {
             "id": entry["id"],
@@ -521,10 +593,10 @@ def list_files(
             "author": _user_ref(entry["author_id"]),
             "created_on": entry["created_on"],
         }
-        for entry in filtered
+        for entry in files_page
     ]
 
-    return _paginate_response("files", payload, limit, offset)
+    return _paginate_response("files", payload, total_count, limit, offset)
 
 
 @app.get("/boards/{board_id}/topics.json")
@@ -539,14 +611,11 @@ def list_board_topics(
         raise HTTPException(status_code=404, detail="Not found")
 
     _board_visibility_or_403(board, auth)
-
-    topics = [
-        message
-        for message in MESSAGES
-        if message["board_id"] == board_id and message["parent_id"] is None
-    ]
-    topics.sort(key=lambda message: message["id"])
-
+    topics, total_count = _collect_page(
+        TOPICS_BY_BOARD_ID.get(board_id, ()),
+        offset=offset,
+        limit=limit,
+    )
     payload = [
         {
             "id": message["id"],
@@ -560,7 +629,7 @@ def list_board_topics(
         for message in topics
     ]
 
-    return _paginate_response("messages", payload, limit, offset)
+    return _paginate_response("messages", payload, total_count, limit, offset)
 
 
 @app.get("/messages/{message_id}.json")
@@ -585,8 +654,7 @@ def message_detail(
             "updated_on": reply["updated_on"],
             "content": reply["content"],
         }
-        for reply in MESSAGES
-        if reply["parent_id"] == message_id
+        for reply in REPLIES_BY_PARENT_ID.get(message_id, ())
     ]
 
     return {
@@ -618,15 +686,7 @@ def wiki_page_detail(
         raise HTTPException(status_code=404, detail="Not found")
 
     _project_visibility_or_403(project["id"], auth)
-
-    page = next(
-        (
-            entry
-            for entry in WIKI_PAGES
-            if entry["project_id"] == project["id"] and entry["title"].lower() == title.lower()
-        ),
-        None,
-    )
+    page = WIKI_PAGE_BY_PROJECT_AND_TITLE.get((project["id"], title.lower()))
     if page is None:
         raise HTTPException(status_code=404, detail="Not found")
 

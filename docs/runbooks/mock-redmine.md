@@ -67,6 +67,8 @@ No code changes are required for cutover.
 - Default mock API key is `mock-api-key`.
 - Private records (private issues and private boards) are visible only with `X-Mock-Role: admin`.
 - Dataset is intentionally large (200+ issues) to simulate realistic sync and retrieval load.
+- Endpoint handlers use page-first filtering/serialization and pre-indexed topic/wiki lookups to
+  stay responsive with larger fixture volumes.
 - Fixtures are coherent around one project theme (`platform-core` / SupportHub Platform).
 - Dataset governance baseline and changelog are stored in `evals/mock_dataset_manifest.v1.json` and `evals/CHANGELOG.md`.
 - Run profile quality checks with:

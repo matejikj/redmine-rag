@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from fastapi.testclient import TestClient
 
+import redmine_rag.mock_redmine.app as mock_redmine_app
 from redmine_rag.mock_redmine.app import app
 
 client = TestClient(app)
@@ -470,6 +473,29 @@ def test_issues_pagination_and_project_filter() -> None:
     assert payload["offset"] == 1
     assert payload["limit"] == 1
     assert len(payload["issues"]) == 1
+
+
+def test_issues_pagination_serializes_only_current_page(monkeypatch: pytest.MonkeyPatch) -> None:
+    serialized_issue_ids: list[int] = []
+    serialize_issue = mock_redmine_app._serialize_issue
+
+    def _tracked_serialize_issue(issue: dict[str, Any], include_fields: set[str]) -> dict[str, Any]:
+        serialized_issue_ids.append(int(issue["id"]))
+        return serialize_issue(issue, include_fields=include_fields)
+
+    monkeypatch.setattr(mock_redmine_app, "_serialize_issue", _tracked_serialize_issue)
+
+    response = client.get(
+        "/issues.json",
+        params={"project_id": "1", "limit": 2, "offset": 3},
+        headers=ADMIN_HEADERS,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["issues"]) == 2
+    assert serialized_issue_ids == [issue["id"] for issue in payload["issues"]]
+    assert len(serialized_issue_ids) == 2
 
 
 def test_issues_updated_on_filter() -> None:

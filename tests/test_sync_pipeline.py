@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from redmine_rag.core.config import get_settings
 from redmine_rag.db.base import Base
 from redmine_rag.db.models import (
+    DocChunk,
     Issue,
     Journal,
     RawEntity,
@@ -83,6 +84,8 @@ async def test_incremental_sync_ingests_mock_redmine_without_duplication(
     assert first_summary["time_entries_synced"] >= 300
     assert first_summary["raw_entities_synced"] > 0
     assert first_summary["wiki_pages_synced"] >= 2
+    assert first_summary["chunks_updated"] > 0
+    assert first_summary["chunk_sources_reindexed"] > 0
 
     session_factory = get_session_factory()
     async with session_factory() as session:
@@ -93,6 +96,10 @@ async def test_incremental_sync_ingests_mock_redmine_without_duplication(
         raw_journal_count = await session.scalar(select(func.count()).select_from(RawJournal))
         raw_entity_count = await session.scalar(select(func.count()).select_from(RawEntity))
         wiki_count = await session.scalar(select(func.count()).select_from(WikiPage))
+        chunk_count = await session.scalar(select(func.count()).select_from(DocChunk))
+        distinct_chunk_keys = await session.scalar(
+            select(func.count(func.distinct(DocChunk.embedding_key)))
+        )
         state = await session.scalar(
             select(SyncState).where(SyncState.key == "redmine_incremental")
         )
@@ -114,6 +121,9 @@ async def test_incremental_sync_ingests_mock_redmine_without_duplication(
     assert raw_entity_count is not None
     assert raw_entity_count > 0
     assert wiki_count == 2
+    assert chunk_count is not None
+    assert chunk_count > 0
+    assert distinct_chunk_keys == chunk_count
     assert state is not None
     assert state.last_sync_at is not None
     assert state.last_success_at is not None
@@ -132,9 +142,11 @@ async def test_incremental_sync_ingests_mock_redmine_without_duplication(
         raw_issue_count_after = await session.scalar(select(func.count()).select_from(RawIssue))
         raw_journal_count_after = await session.scalar(select(func.count()).select_from(RawJournal))
         wiki_count_after = await session.scalar(select(func.count()).select_from(WikiPage))
+        chunk_count_after = await session.scalar(select(func.count()).select_from(DocChunk))
 
     assert issue_count_after == issue_count
     assert journal_count_after == journal_count
     assert raw_issue_count_after == raw_issue_count
     assert raw_journal_count_after == raw_journal_count
     assert wiki_count_after == wiki_count
+    assert chunk_count_after == chunk_count

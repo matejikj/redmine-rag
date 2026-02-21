@@ -47,6 +47,7 @@ make typecheck
 make test
 make check
 make sync
+make reindex
 make eval
 make dataset-quality
 make mock-redmine
@@ -100,6 +101,16 @@ REDMINE_WIKI_PAGES=platform-core:Feature-Login,platform-core:Incident-Triage-Pla
 - `REDMINE_MODULES`: registry toggle for sync pipeline modules.
 - `REDMINE_BOARD_IDS`: board IDs for board/message ingestion.
 - `REDMINE_WIKI_PAGES`: wiki references in `project_ref:title` format.
+
+## Chunking and FTS
+
+- Incremental sync updates `doc_chunk` for issues, journals, wiki pages, attachments, time entries, news, documents, and board messages.
+- SQLite FTS5 index is maintained by triggers on `doc_chunk`.
+- For full rebuild of chunks and FTS content, run:
+
+```bash
+make reindex
+```
 
 ## Agent-first development
 

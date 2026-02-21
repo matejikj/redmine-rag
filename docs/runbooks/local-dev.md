@@ -39,6 +39,13 @@ Sync behavior:
 - persists raw and normalized rows with idempotent upserts
 - updates incremental cursors for entities with `updated_on` filtering (`issues`, `time_entries`)
 - records global lifecycle in `sync_state` and per-entity cursor state in `sync_cursor`
+- incrementally refreshes `doc_chunk` sources and SQLite FTS index for lexical retrieval
+
+## Full chunk reindex
+
+```bash
+make reindex
+```
 
 ## Develop without real Redmine access
 

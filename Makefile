@@ -16,6 +16,7 @@ help:
 	@echo "  make test        - run tests"
 	@echo "  make check       - run all checks"
 	@echo "  make sync        - trigger Redmine sync"
+	@echo "  make reindex     - rebuild doc chunks and FTS index"
 	@echo "  make eval        - run local eval scaffold"
 	@echo "  make dataset-quality - validate dataset quality constraints"
 	@echo "  make mock-redmine - run local Mock Redmine API"
@@ -49,6 +50,9 @@ check: lint typecheck test
 
 sync:
 	$(RUNNER) -m redmine_rag.cli sync run
+
+reindex:
+	$(RUNNER) -m redmine_rag.cli index reindex
 
 eval:
 	$(RUNNER) scripts/eval/run_eval.py

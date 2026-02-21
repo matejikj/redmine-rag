@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from redmine_rag.core.config import get_settings
 from redmine_rag.db.models import Project, SyncCursor, SyncState
 from redmine_rag.db.session import get_session_factory
+from redmine_rag.indexing.chunk_indexer import ChunkIndexer
 from redmine_rag.ingestion.redmine_client import RedmineClient
 from redmine_rag.ingestion.repository import IngestionRepository
 
@@ -88,6 +89,8 @@ async def run_incremental_sync(
         "raw_issues_synced": 0,
         "raw_journals_synced": 0,
         "raw_wiki_synced": 0,
+        "chunk_sources_reindexed": 0,
+        "chunks_updated": 0,
         "finished_at": None,
     }
 
@@ -105,6 +108,7 @@ async def run_incremental_sync(
     async with session_factory() as session:
         repo = IngestionRepository(session)
         sync_state = await _get_or_create_sync_state(session, key="redmine_incremental")
+        previous_success_at = sync_state.last_success_at
         sync_state.last_sync_at = fetched_at
         sync_state.last_error = None
         await session.commit()
@@ -172,6 +176,15 @@ async def run_incremental_sync(
                         )
                         continue
                     raise
+
+            chunk_indexer = ChunkIndexer(
+                session,
+                base_url=context.base_url,
+            )
+            chunk_since = _cursor_lower_bound(previous_success_at, context.overlap_minutes)
+            chunk_stats = await chunk_indexer.refresh(since=chunk_since)
+            summary["chunk_sources_reindexed"] = chunk_stats.sources_reindexed
+            summary["chunks_updated"] = chunk_stats.chunks_updated
 
             sync_state.last_success_at = datetime.now(UTC)
             sync_state.last_error = None

@@ -31,6 +31,9 @@ check:
 sync:
   {{python}} -m redmine_rag.cli sync run
 
+reindex:
+  {{python}} -m redmine_rag.cli index reindex
+
 eval:
   {{python}} scripts/eval/run_eval.py
 

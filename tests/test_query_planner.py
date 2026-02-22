@@ -55,13 +55,13 @@ async def test_build_retrieval_plan_invalid_llm_payload_returns_failed_diagnosti
     monkeypatch.setattr(
         query_planner,
         "resolve_runtime_model",
-        lambda _settings: "Mistral-7B-Instruct-v0.3-Q4_K_M",
+        lambda _settings: "mistral:7b-instruct-v0.3-q4_K_M",
     )
 
     settings = Settings(
         retrieval_planner_enabled=True,
         llm_provider="ollama",
-        ollama_model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+        ollama_model="mistral:7b-instruct-v0.3-q4_K_M",
     )
     plan, diagnostics = await build_retrieval_plan(
         query="incident query",

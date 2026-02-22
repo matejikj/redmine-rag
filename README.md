@@ -157,7 +157,7 @@ LLM structured extraction (JSON Schema):
 - Enabled by `LLM_EXTRACT_ENABLED=true` and runs inside `POST /v1/extract/properties`.
 - Local Ollama provider is supported (`LLM_PROVIDER=ollama`) with configurable runtime keys:
   - `OLLAMA_BASE_URL` (default `http://127.0.0.1:11434`)
-  - `OLLAMA_MODEL` (default `Mistral-7B-Instruct-v0.3-Q4_K_M`)
+  - `OLLAMA_MODEL` (default `mistral:7b-instruct-v0.3-q4_K_M`)
   - `OLLAMA_TIMEOUT_S`, `OLLAMA_MAX_CONCURRENCY`
 - Prompt and schema are versioned in repo:
   - `prompts/extract_properties_v1.md`
@@ -182,11 +182,11 @@ LLM structured extraction (JSON Schema):
 Ollama local setup example:
 
 ```bash
-ollama pull Mistral-7B-Instruct-v0.3-Q4_K_M
+ollama pull mistral:7b-instruct-v0.3-q4_K_M
 export LLM_PROVIDER=ollama
 export LLM_EXTRACT_ENABLED=true
 export OLLAMA_BASE_URL=http://127.0.0.1:11434
-export OLLAMA_MODEL=Mistral-7B-Instruct-v0.3-Q4_K_M
+export OLLAMA_MODEL=mistral:7b-instruct-v0.3-q4_K_M
 export ASK_ANSWER_MODE=llm_grounded
 export ASK_LLM_MAX_RETRIES=1
 export ASK_LLM_COST_LIMIT_USD=0.05

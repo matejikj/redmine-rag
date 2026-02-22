@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     llm_provider: str = "api"
     llm_model: str = "gpt-5-mini"
     ollama_base_url: str = "http://127.0.0.1:11434"
-    ollama_model: str = "Mistral-7B-Instruct-v0.3-Q4_K_M"
+    ollama_model: str = "mistral:7b-instruct-v0.3-q4_K_M"
     ollama_timeout_s: float = 45.0
     ollama_max_concurrency: int = 2
     llm_extract_enabled: bool = False

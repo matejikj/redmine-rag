@@ -255,7 +255,7 @@ def test_ask_llm_grounded_uses_validated_claims(monkeypatch: pytest.MonkeyPatch)
             ask_llm_cost_limit_usd=1.0,
             llm_provider="ollama",
             llm_model="unused",
-            ollama_model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+            ollama_model="mistral:7b-instruct-v0.3-q4_K_M",
             llm_runtime_cost_limit_usd=10.0,
             llm_circuit_breaker_enabled=True,
             llm_circuit_failure_threshold=3,
@@ -271,7 +271,7 @@ def test_ask_llm_grounded_uses_validated_claims(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(
         ask_service,
         "resolve_runtime_model",
-        lambda _settings: "Mistral-7B-Instruct-v0.3-Q4_K_M",
+        lambda _settings: "mistral:7b-instruct-v0.3-q4_K_M",
     )
     client = TestClient(app)
 
@@ -338,7 +338,7 @@ def test_ask_llm_grounded_prompt_injection_not_bypassing_grounding(
             ask_llm_cost_limit_usd=1.0,
             llm_provider="ollama",
             llm_model="unused",
-            ollama_model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+            ollama_model="mistral:7b-instruct-v0.3-q4_K_M",
             llm_runtime_cost_limit_usd=10.0,
             llm_circuit_breaker_enabled=True,
             llm_circuit_failure_threshold=3,
@@ -354,7 +354,7 @@ def test_ask_llm_grounded_prompt_injection_not_bypassing_grounding(
     monkeypatch.setattr(
         ask_service,
         "resolve_runtime_model",
-        lambda _settings: "Mistral-7B-Instruct-v0.3-Q4_K_M",
+        lambda _settings: "mistral:7b-instruct-v0.3-q4_K_M",
     )
     client = TestClient(app)
 
@@ -415,7 +415,7 @@ def test_ask_llm_grounded_falls_back_on_timeout(monkeypatch: pytest.MonkeyPatch)
             ask_llm_cost_limit_usd=1.0,
             llm_provider="ollama",
             llm_model="unused",
-            ollama_model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+            ollama_model="mistral:7b-instruct-v0.3-q4_K_M",
             llm_runtime_cost_limit_usd=10.0,
             llm_circuit_breaker_enabled=True,
             llm_circuit_failure_threshold=3,
@@ -433,7 +433,7 @@ def test_ask_llm_grounded_falls_back_on_timeout(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(
         ask_service,
         "resolve_runtime_model",
-        lambda _settings: "Mistral-7B-Instruct-v0.3-Q4_K_M",
+        lambda _settings: "mistral:7b-instruct-v0.3-q4_K_M",
     )
 
     client = TestClient(app)
@@ -500,7 +500,7 @@ def test_ask_llm_grounded_skips_when_request_budget_exceeded(
             ask_llm_cost_limit_usd=0.000001,
             llm_provider="ollama",
             llm_model="unused",
-            ollama_model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+            ollama_model="mistral:7b-instruct-v0.3-q4_K_M",
             llm_runtime_cost_limit_usd=10.0,
             llm_circuit_breaker_enabled=True,
             llm_circuit_failure_threshold=3,
@@ -518,7 +518,7 @@ def test_ask_llm_grounded_skips_when_request_budget_exceeded(
     monkeypatch.setattr(
         ask_service,
         "resolve_runtime_model",
-        lambda _settings: "Mistral-7B-Instruct-v0.3-Q4_K_M",
+        lambda _settings: "mistral:7b-instruct-v0.3-q4_K_M",
     )
 
     client = TestClient(app)
@@ -579,7 +579,7 @@ def test_ask_llm_grounded_falls_back_on_invalid_payload(monkeypatch: pytest.Monk
             ask_llm_cost_limit_usd=1.0,
             llm_provider="ollama",
             llm_model="unused",
-            ollama_model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+            ollama_model="mistral:7b-instruct-v0.3-q4_K_M",
             llm_runtime_cost_limit_usd=10.0,
             llm_circuit_breaker_enabled=True,
             llm_circuit_failure_threshold=3,
@@ -597,7 +597,7 @@ def test_ask_llm_grounded_falls_back_on_invalid_payload(monkeypatch: pytest.Monk
     monkeypatch.setattr(
         ask_service,
         "resolve_runtime_model",
-        lambda _settings: "Mistral-7B-Instruct-v0.3-Q4_K_M",
+        lambda _settings: "mistral:7b-instruct-v0.3-q4_K_M",
     )
 
     client = TestClient(app)
@@ -661,7 +661,7 @@ def test_ask_llm_grounded_repeated_calls_under_load(monkeypatch: pytest.MonkeyPa
             ask_llm_cost_limit_usd=1.0,
             llm_provider="ollama",
             llm_model="unused",
-            ollama_model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+            ollama_model="mistral:7b-instruct-v0.3-q4_K_M",
             llm_runtime_cost_limit_usd=10.0,
             llm_circuit_breaker_enabled=True,
             llm_circuit_failure_threshold=3,
@@ -679,7 +679,7 @@ def test_ask_llm_grounded_repeated_calls_under_load(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(
         ask_service,
         "resolve_runtime_model",
-        lambda _settings: "Mistral-7B-Instruct-v0.3-Q4_K_M",
+        lambda _settings: "mistral:7b-instruct-v0.3-q4_K_M",
     )
 
     client = TestClient(app)

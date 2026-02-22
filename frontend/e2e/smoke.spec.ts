@@ -81,7 +81,7 @@ test("routing and API connectivity smoke", async ({ page }) => {
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Platform Control Plane" })).toBeVisible();
-  await expect(page.getByText("redmine-rag")).toBeVisible();
+  await expect(page.getByText("Redmine RAG")).toBeVisible();
 
   await page.getByRole("link", { name: "Sync" }).click();
   await expect(page.getByRole("heading", { name: "Sync and Ingestion Control Center" })).toBeVisible();
@@ -89,7 +89,7 @@ test("routing and API connectivity smoke", async ({ page }) => {
 
   await page.getByRole("button", { name: "Start sync" }).click();
   await expect(page.getByText("Job accepted:")).toBeVisible();
-  await expect(page.getByText("job-new-sync")).toBeVisible();
+  await expect(page.locator("p:has-text('Job accepted:') code")).toHaveText("job-new-sync");
 });
 
 test("ask workbench and citation explorer journey", async ({ page }) => {
@@ -104,7 +104,7 @@ test("ask workbench and citation explorer journey", async ({ page }) => {
           "2. Rollback guidance is documented in incident playbook. [2]",
           "",
           "_Retrieval mode: hybrid; lexical=10, vector=7, fused=5_"
-        ].join("\\n"),
+        ].join("\n"),
         citations: [
           {
             id: 1,
@@ -136,8 +136,10 @@ test("ask workbench and citation explorer journey", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Explain / debug" })).toBeVisible();
 
   await page.getByRole("button", { name: "Explain / debug" }).click();
-  await expect(page.getByText("Retrieval mode:")).toBeVisible();
-  await expect(page.getByText("hybrid")).toBeVisible();
+  const retrievalModeParagraph = page.locator("p", {
+    has: page.locator("strong", { hasText: "Retrieval mode:" })
+  });
+  await expect(retrievalModeParagraph).toContainText("hybrid");
 
   await page.getByLabel("Source filter").selectOption("wiki");
   await expect(page.getByText("1:Incident-Triage-Playbook")).toBeVisible();
@@ -238,7 +240,7 @@ test("metrics dashboard extraction and evaluation flow", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText("Per-Project Breakdown")).toBeVisible();
   await expect(page.getByText("Gate status:")).toBeVisible();
-  await expect(page.getByText("FAIL")).toBeVisible();
+  await expect(page.getByText(/^FAIL$/)).toBeVisible();
 
   await page.getByRole("button", { name: "Run extraction" }).click();
   await expect(page.getByText("processed 4 issues")).toBeVisible();
@@ -297,7 +299,7 @@ test("ops dashboard run controls and release checklist journey", async ({ page }
         redmine_base_url: "http://127.0.0.1:8081",
         redmine_allowed_hosts: ["127.0.0.1", "localhost"],
         llm_provider: "ollama",
-        llm_model: "Mistral-7B-Instruct-v0.3-Q4_K_M",
+        llm_model: "mistral:7b-instruct-v0.3-q4_K_M",
         llm_extract_enabled: true
       })
     });
@@ -350,7 +352,7 @@ test("ops dashboard run controls and release checklist journey", async ({ page }
 
   await page.goto("/ops");
   await expect(page.getByRole("heading", { name: "Ops, Release, and Hardening" })).toBeVisible();
-  await expect(page.getByText("Mistral-7B-Instruct-v0.3-Q4_K_M")).toBeVisible();
+  await expect(page.getByText("mistral:7b-instruct-v0.3-q4_K_M")).toBeVisible();
   await expect(page.getByText("success=93.0%, p95=12900 ms, circuit=closed")).toBeVisible();
 
   await page.getByRole("button", { name: "Run backup" }).click();

@@ -143,7 +143,7 @@ async def test_build_structured_extraction_client_supports_ollama_provider(
         system_prompt="sys",
         user_content="ctx",
         schema={},
-        model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+        model="mistral:7b-instruct-v0.3-q4_K_M",
         timeout_s=10.0,
     )
     parsed = llm_structured.parse_structured_payload(payload)

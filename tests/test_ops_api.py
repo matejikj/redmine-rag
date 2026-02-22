@@ -22,7 +22,7 @@ def isolated_ops_api_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     monkeypatch.setenv("VECTOR_META_PATH", str(vector_meta))
     monkeypatch.setenv("APP_ENV", "dev")
     monkeypatch.setenv("LLM_PROVIDER", "ollama")
-    monkeypatch.setenv("OLLAMA_MODEL", "Mistral-7B-Instruct-v0.3-Q4_K_M")
+    monkeypatch.setenv("OLLAMA_MODEL", "mistral:7b-instruct-v0.3-q4_K_M")
 
     get_settings.cache_clear()
     reset_ops_run_history()
@@ -49,7 +49,7 @@ def test_ops_environment_endpoint_returns_runtime_configuration(
     payload = response.json()
     assert payload["app"] == "redmine-rag"
     assert payload["llm_provider"] == "ollama"
-    assert payload["llm_model"] == "Mistral-7B-Instruct-v0.3-Q4_K_M"
+    assert payload["llm_model"] == "mistral:7b-instruct-v0.3-q4_K_M"
 
 
 def test_ops_backup_and_maintenance_endpoints_record_run_history(

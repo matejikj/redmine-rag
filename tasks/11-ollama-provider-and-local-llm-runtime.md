@@ -2,7 +2,7 @@
 
 ## Goal
 
-Enable local LLM inference through Ollama with model `Mistral-7B-Instruct-v0.3-Q4_K_M`.
+Enable local LLM inference through Ollama with model `mistral:7b-instruct-v0.3-q4_K_M`.
 
 ## Scope
 
@@ -21,7 +21,7 @@ Enable local LLM inference through Ollama with model `Mistral-7B-Instruct-v0.3-Q
 ## Acceptance Criteria
 
 - With `LLM_PROVIDER=ollama`, extraction can call local Ollama successfully.
-- Default model can be set to `Mistral-7B-Instruct-v0.3-Q4_K_M` via config only.
+- Default model can be set to `mistral:7b-instruct-v0.3-q4_K_M` via config only.
 - System fails fast with actionable error when model is unavailable.
 - `/healthz` reports degraded status when Ollama is unreachable.
 

@@ -118,10 +118,10 @@ For local development the default provider `mock` is deterministic and offline.
 Use local Ollama runtime instead of mock:
 
 ```bash
-ollama pull Mistral-7B-Instruct-v0.3-Q4_K_M
+ollama pull mistral:7b-instruct-v0.3-q4_K_M
 export LLM_PROVIDER=ollama
 export OLLAMA_BASE_URL=http://127.0.0.1:11434
-export OLLAMA_MODEL=Mistral-7B-Instruct-v0.3-Q4_K_M
+export OLLAMA_MODEL=mistral:7b-instruct-v0.3-q4_K_M
 export OLLAMA_TIMEOUT_S=45
 export OLLAMA_MAX_CONCURRENCY=2
 export ASK_ANSWER_MODE=llm_grounded

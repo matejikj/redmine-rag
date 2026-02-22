@@ -65,7 +65,7 @@ async def isolated_health_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     monkeypatch.setenv("LLM_EXTRACT_ENABLED", "true")
     monkeypatch.setenv("LLM_PROVIDER", "ollama")
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-    monkeypatch.setenv("OLLAMA_MODEL", "Mistral-7B-Instruct-v0.3-Q4_K_M")
+    monkeypatch.setenv("OLLAMA_MODEL", "mistral:7b-instruct-v0.3-q4_K_M")
 
     reset_llm_telemetry()
     get_settings.cache_clear()
@@ -131,7 +131,7 @@ async def test_health_reports_degraded_when_ollama_runtime_unreachable(
         return LlmRuntimeProbe(
             provider="ollama",
             base_url="http://127.0.0.1:11434",
-            model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+            model="mistral:7b-instruct-v0.3-q4_K_M",
             available=False,
             model_available=None,
             detail="Ollama request failed: connection refused",

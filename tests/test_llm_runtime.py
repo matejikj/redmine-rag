@@ -29,7 +29,7 @@ async def test_ollama_runtime_generate_success() -> None:
         transport=httpx.MockTransport(_handler),
     )
     output = await client.generate(
-        model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+        model="mistral:7b-instruct-v0.3-q4_K_M",
         prompt="issue context",
         system_prompt="return json",
         timeout_s=5.0,
@@ -37,7 +37,7 @@ async def test_ollama_runtime_generate_success() -> None:
     )
 
     assert output == '{"topic":"oauth","confidence":0.8}'
-    assert captured_payload["model"] == "Mistral-7B-Instruct-v0.3-Q4_K_M"
+    assert captured_payload["model"] == "mistral:7b-instruct-v0.3-q4_K_M"
     assert captured_payload["prompt"] == "issue context"
     assert captured_payload["system"] == "return json"
     assert captured_payload["stream"] is False
@@ -71,7 +71,7 @@ async def test_ollama_probe_handles_connect_error() -> None:
 
     probe = await probe_ollama_runtime(
         base_url="http://127.0.0.1:11434",
-        model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+        model="mistral:7b-instruct-v0.3-q4_K_M",
         timeout_s=1.0,
         transport=httpx.MockTransport(_handler),
     )
@@ -90,14 +90,14 @@ async def test_ollama_probe_reports_model_availability() -> None:
             json={
                 "models": [
                     {"name": "mistral:latest"},
-                    {"name": "Mistral-7B-Instruct-v0.3-Q4_K_M"},
+                    {"name": "mistral:7b-instruct-v0.3-q4_K_M"},
                 ]
             },
         )
 
     probe = await probe_ollama_runtime(
         base_url="http://127.0.0.1:11434",
-        model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+        model="mistral:7b-instruct-v0.3-q4_K_M",
         timeout_s=1.0,
         transport=httpx.MockTransport(_handler),
     )
@@ -113,6 +113,6 @@ def test_resolve_runtime_model_prefers_ollama_model_for_ollama_provider() -> Non
     settings = Settings(
         llm_provider="ollama",
         llm_model="gpt-5-mini",
-        ollama_model="Mistral-7B-Instruct-v0.3-Q4_K_M",
+        ollama_model="mistral:7b-instruct-v0.3-q4_K_M",
     )
-    assert resolve_runtime_model(settings) == "Mistral-7B-Instruct-v0.3-Q4_K_M"
+    assert resolve_runtime_model(settings) == "mistral:7b-instruct-v0.3-q4_K_M"

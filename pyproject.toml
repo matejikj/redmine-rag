@@ -33,7 +33,7 @@ ml = [
   "scikit-learn>=1.7.2",
 ]
 local-llm = [
-  "ollama>=0.6.0",
+  "ollama>=0.6.1",
 ]
 
 [project.scripts]
